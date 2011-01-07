@@ -92,6 +92,11 @@ struct clkctl_acpu_speed acpu_freq_tbl[] = {
 	{ 921600, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x18, 0, 1275 },
 	{ 960000, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x19, 0, 1275 },
 	{ 998400, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x1A, 0, 1275 },
+	{ 1036800, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x1B, 0, 1275 },
+	{ 1075200, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x1C, 0, 1275 },
+	{ 1113600, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x1D, 0, 1275 },
+	{ 1152000, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x1E, 0, 1300 }, 
+	{ 1190400, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x1F, 0, 1300 }, 
 	{ 0 },
 };
 
@@ -131,7 +136,7 @@ static void __init acpuclk_init_cpufreq_table(void)
 		}
 
 		/* Take the fastest speed available at the specified VDD level */
-		if (vdd != acpu_freq_tbl[i + 1].vdd)
+		//if (vdd != acpu_freq_tbl[i + 1].vdd)
 			freq_table[i].frequency = acpu_freq_tbl[i].acpu_khz;
 	}
 
