@@ -244,8 +244,9 @@ static int avs_set_target_voltage(int freq_idx, bool update_table)
 
 	new_voltage = avs_get_target_voltage(freq_idx, update_table);
 	if (avs_state.vdd != new_voltage) {
-	  /*AVSDEBUG*//*pr_info("AVS setting V to %d mV @%d MHz\n",
-	    new_voltage, acpu_vdd_tbl[freq_idx].acpu_khz / 1000);*/
+	  /*AVSDEBUG*/
+	  //pr_info("AVS setting V to %d mV @%d MHz\n", 
+	  //	  new_voltage, acpu_vdd_tbl[freq_idx].acpu_khz / 1000);
 		rc = avs_state.set_vdd(new_voltage);
 		while (rc && ctr) {
 			rc = avs_state.set_vdd(new_voltage);
