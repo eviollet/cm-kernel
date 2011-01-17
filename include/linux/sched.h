@@ -36,8 +36,15 @@
 #define SCHED_FIFO		1
 #define SCHED_RR		2
 #define SCHED_BATCH		3
-/* SCHED_ISO: reserved but not implemented yet */
+/* SCHED_ISO: Implemented on BFS only */
 #define SCHED_IDLE		5
+#ifdef CONFIG_SCHED_BFS
+#define SCHED_ISO		4
+#define SCHED_IDLEPRIO		SCHED_IDLE
+#define SCHED_MAX		(SCHED_IDLEPRIO)
+#define SCHED_RANGE(policy)	((policy) <= SCHED_MAX)
+#endif
+
 /* Can be ORed in to make sure the process is reverted back to SCHED_NORMAL on fork */
 #define SCHED_RESET_ON_FORK     0x40000000
 
@@ -1174,17 +1181,36 @@ struct task_struct {
 
 	int lock_depth;		/* BKL lock depth */
 
+#ifndef CONFIG_SCHED_BFS
 #ifdef CONFIG_SMP
 #ifdef __ARCH_WANT_UNLOCKED_CTXSW
 	int oncpu;
 #endif
 #endif
+#else /* CONFIG_SCHED_BFS */
+	int oncpu;
+#endif
 
 	int prio, static_prio, normal_prio;
 	unsigned int rt_priority;
+#ifdef CONFIG_SCHED_BFS
+	int time_slice;
+	/* Virtual deadline in niffies, and when the deadline was set */
+	u64 deadline, deadline_niffy;
+	struct list_head run_list;
+	u64 last_ran;
+	u64 sched_time; /* sched_clock time spent running */
+	/* Number of threads currently requesting CPU time */
+	unsigned long threads_running;
+	/* Depth of forks from init */
+	int fork_depth;
+
+	unsigned long rt_timeout;
+#else /* CONFIG_SCHED_BFS */
 	const struct sched_class *sched_class;
 	struct sched_entity se;
 	struct sched_rt_entity rt;
+#endif
 
 #ifdef CONFIG_PREEMPT_NOTIFIERS
 	/* list of struct preempt_notifier: */

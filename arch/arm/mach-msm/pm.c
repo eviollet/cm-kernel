@@ -131,9 +131,11 @@ int msm_irq_idle_sleep_allowed(void);
 int msm_irq_pending(void);
 int clks_print_running(void);
 
+#ifdef CONFIG_AXI_SCREEN_POLICY
 static int axi_rate;
 static int sleep_axi_rate;
 static struct clk *axi_clk;
+#endif
 static uint32_t *msm_pm_reset_vector;
 
 static uint32_t msm_pm_max_sleep_time;
@@ -381,9 +383,11 @@ static int msm_sleep(int sleep_mode, uint32_t sleep_delay, int from_idle)
 		if (pm_saved_acpu_clk_rate == 0)
 			goto ramp_down_failed;
 
+#ifdef CONFIG_AXI_SCREEN_POLICY
 		/* Drop AXI request when the screen is on */
 		if (axi_rate)
 			clk_set_rate(axi_clk, sleep_axi_rate);
+#endif
 	}
 	if (sleep_mode < MSM_PM_SLEEP_MODE_APPS_SLEEP) {
 		if (msm_pm_debug_mask & MSM_PM_DEBUG_SMSM_STATE)
@@ -424,9 +428,11 @@ static int msm_sleep(int sleep_mode, uint32_t sleep_delay, int from_idle)
 			printk(KERN_ERR "msm_sleep(): clk_set_rate %ld "
 			       "failed\n", pm_saved_acpu_clk_rate);
 
+#ifdef CONFIG_AXI_SCREEN_POLICY
 		/* Restore axi rate if needed */
 		if (axi_rate)
 			clk_set_rate(axi_clk, axi_rate);
+#endif
 	}
 	if (msm_pm_debug_mask & MSM_PM_DEBUG_STATE)
 		printk(KERN_INFO "msm_sleep(): exit A11S_CLK_SLEEP_EN %x, "
@@ -731,6 +737,7 @@ void msm_pm_set_max_sleep_time(int64_t max_sleep_time_ns)
 EXPORT_SYMBOL(msm_pm_set_max_sleep_time);
 
 #if defined(CONFIG_EARLYSUSPEND) && defined(CONFIG_ARCH_MSM_SCORPION)
+#ifdef CONFIG_AXI_SCREEN_POLICY
 /* axi 128 screen on, 61mhz screen off */
 static void axi_early_suspend(struct early_suspend *handler) {
 	axi_rate = 0;
@@ -748,7 +755,9 @@ static struct early_suspend axi_screen_suspend = {
 	.resume = axi_late_resume,
 };
 #endif
+#endif
 
+#ifdef CONFIG_AXI_SCREEN_POLICY
 static void __init msm_pm_axi_init(void)
 {
 #if defined(CONFIG_EARLYSUSPEND) && defined(CONFIG_ARCH_MSM_SCORPION)
@@ -766,14 +775,16 @@ static void __init msm_pm_axi_init(void)
 	axi_rate = 0;
 #endif
 }
+#endif
 
 static int __init msm_pm_init(void)
 {
 	pm_power_off = msm_pm_power_off;
 	arm_pm_restart = msm_pm_restart;
 	msm_pm_max_sleep_time = 0;
+#ifdef CONFIG_AXI_SCREEN_POLICY
 	msm_pm_axi_init();
-
+#endif
 	register_reboot_notifier(&msm_reboot_notifier);
 
 	msm_pm_reset_vector = ioremap(RESET_VECTOR, PAGE_SIZE);

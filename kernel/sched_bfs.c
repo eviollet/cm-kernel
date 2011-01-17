@@ -68,7 +68,6 @@
 #include <linux/bootmem.h>
 #include <linux/ftrace.h>
 #include <linux/slab.h>
-#include <linux/zentune.h>
 
 #include <asm/tlb.h>
 #include <asm/unistd.h>
@@ -128,30 +127,14 @@
  * Value is in ms and set to a minimum of 6ms. Scales with number of cpus.
  * Tunable via /proc interface.
  */
-#if defined(CONFIG_ZEN_DEFAULT)
-int rr_interval __read_mostly = rr_interval_default;
-#elif defined(CONFIG_ZEN_SERVER)
-int rr_interval __read_mostly = rr_interval_server;
-#elif defined(CONFIG_ZEN_DESKTOP)
-int rr_interval __read_mostly = rr_interval_desktop;
-#elif defined(CONFIG_ZEN_CUSTOM)
-int rr_interval __read_mostly = rr_interval_custom;
-#endif
+int rr_interval __read_mostly = 6;
 
 /*
  * sched_iso_cpu - sysctl which determines the cpu percentage SCHED_ISO tasks
  * are allowed to run five seconds as real time tasks. This is the total over
  * all online cpus.
  */
-#if defined(CONFIG_ZEN_DEFAULT)
-int sched_iso_cpu __read_mostly = sched_iso_cpu_default;
-#elif defined(CONFIG_ZEN_SERVER)
-int sched_iso_cpu __read_mostly = sched_iso_cpu_server;
-#elif defined(CONFIG_ZEN_DESKTOP)
-int sched_iso_cpu __read_mostly = sched_iso_cpu_desktop;
-#elif defined(CONFIG_ZEN_CUSTOM)
-int sched_iso_cpu __read_mostly = sched_iso_cpu_custom;
-#endif
+int sched_iso_cpu __read_mostly = 70;
 
 /*
  * group_thread_accounting - sysctl to decide whether to treat whole thread
@@ -568,26 +551,6 @@ static inline void __task_grq_unlock(void)
 	__releases(grq.lock)
 {
 	grq_unlock();
-}
-
-/*
- * Look for any tasks *anywhere* that are running nice 0 or better. We do
- * this lockless for overhead reasons since the occasional wrong result
- * is harmless.
- */
-int above_background_load(void)
-{
-	struct task_struct *cpu_curr;
-	unsigned long cpu;
-
-	for_each_online_cpu(cpu) {
-		cpu_curr = cpu_rq(cpu)->curr;
-		if (unlikely(!cpu_curr))
-			continue;
-		if (PRIO_TO_NICE(cpu_curr->static_prio) < 1)
-			return 1;
-	}
-	return 0;
 }
 
 #ifndef __ARCH_WANT_UNLOCKED_CTXSW
@@ -3152,7 +3115,7 @@ void complete_all(struct completion *x)
 EXPORT_SYMBOL(complete_all);
 
 static inline long __sched
-do_wait_for_common(struct completion *x, long timeout, int state)
+do_wait_for_common(struct completion *x, long timeout, int state, int iowait)
 {
 	if (!x->done) {
 		DECLARE_WAITQUEUE(wait, current);
@@ -3165,7 +3128,10 @@ do_wait_for_common(struct completion *x, long timeout, int state)
 			}
 			__set_current_state(state);
 			spin_unlock_irq(&x->wait.lock);
-			timeout = schedule_timeout(timeout);
+			if (iowait)
+				timeout = io_schedule_timeout(timeout);
+			else
+				timeout = schedule_timeout(timeout);
 			spin_lock_irq(&x->wait.lock);
 		} while (!x->done && timeout);
 		__remove_wait_queue(&x->wait, &wait);
@@ -3177,12 +3143,12 @@ do_wait_for_common(struct completion *x, long timeout, int state)
 }
 
 static long __sched
-wait_for_common(struct completion *x, long timeout, int state)
+wait_for_common(struct completion *x, long timeout, int state, int iowait)
 {
 	might_sleep();
 
 	spin_lock_irq(&x->wait.lock);
-	timeout = do_wait_for_common(x, timeout, state);
+	timeout = do_wait_for_common(x, timeout, state, iowait);
 	spin_unlock_irq(&x->wait.lock);
 	return timeout;
 }
@@ -3199,9 +3165,22 @@ wait_for_common(struct completion *x, long timeout, int state)
  */
 void __sched wait_for_completion(struct completion *x)
 {
-	wait_for_common(x, MAX_SCHEDULE_TIMEOUT, TASK_UNINTERRUPTIBLE);
+	wait_for_common(x, MAX_SCHEDULE_TIMEOUT, TASK_UNINTERRUPTIBLE, 0);
 }
 EXPORT_SYMBOL(wait_for_completion);
+
+/**
+ * wait_for_completion_io: - waits for completion of a task
+ * @x:  holds the state of this particular completion
+ *
+ * This waits for completion of a specific task to be signaled. Treats any
+ * sleeping as waiting for IO for the purposes of process accounting.
+ */
+void __sched wait_for_completion_io(struct completion *x)
+{
+	wait_for_common(x, MAX_SCHEDULE_TIMEOUT, TASK_UNINTERRUPTIBLE, 1);
+}
+EXPORT_SYMBOL(wait_for_completion_io);
 
 /**
  * wait_for_completion_timeout: - waits for completion of a task (w/timeout)
@@ -3215,7 +3194,7 @@ EXPORT_SYMBOL(wait_for_completion);
 unsigned long __sched
 wait_for_completion_timeout(struct completion *x, unsigned long timeout)
 {
-	return wait_for_common(x, timeout, TASK_UNINTERRUPTIBLE);
+	return wait_for_common(x, timeout, TASK_UNINTERRUPTIBLE, 0);
 }
 EXPORT_SYMBOL(wait_for_completion_timeout);
 
@@ -3228,7 +3207,7 @@ EXPORT_SYMBOL(wait_for_completion_timeout);
  */
 int __sched wait_for_completion_interruptible(struct completion *x)
 {
-	long t = wait_for_common(x, MAX_SCHEDULE_TIMEOUT, TASK_INTERRUPTIBLE);
+	long t = wait_for_common(x, MAX_SCHEDULE_TIMEOUT, TASK_INTERRUPTIBLE, 0);
 	if (t == -ERESTARTSYS)
 		return t;
 	return 0;
@@ -3247,7 +3226,7 @@ unsigned long __sched
 wait_for_completion_interruptible_timeout(struct completion *x,
 					  unsigned long timeout)
 {
-	return wait_for_common(x, timeout, TASK_INTERRUPTIBLE);
+	return wait_for_common(x, timeout, TASK_INTERRUPTIBLE, 0);
 }
 EXPORT_SYMBOL(wait_for_completion_interruptible_timeout);
 
@@ -3260,7 +3239,7 @@ EXPORT_SYMBOL(wait_for_completion_interruptible_timeout);
  */
 int __sched wait_for_completion_killable(struct completion *x)
 {
-	long t = wait_for_common(x, MAX_SCHEDULE_TIMEOUT, TASK_KILLABLE);
+	long t = wait_for_common(x, MAX_SCHEDULE_TIMEOUT, TASK_KILLABLE, 0);
 	if (t == -ERESTARTSYS)
 		return t;
 	return 0;
@@ -3280,7 +3259,7 @@ unsigned long __sched
 wait_for_completion_killable_timeout(struct completion *x,
 				     unsigned long timeout)
 {
-	return wait_for_common(x, timeout, TASK_KILLABLE);
+	return wait_for_common(x, timeout, TASK_KILLABLE, 0);
 }
 EXPORT_SYMBOL(wait_for_completion_killable_timeout);
 
