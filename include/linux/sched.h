@@ -38,9 +38,9 @@
 #define SCHED_BATCH		3
 /* SCHED_ISO: Implemented on BFS only */
 #define SCHED_IDLE		5
+#define SCHED_IDLEPRIO		SCHED_IDLE
 #ifdef CONFIG_SCHED_BFS
 #define SCHED_ISO		4
-#define SCHED_IDLEPRIO		SCHED_IDLE
 #define SCHED_MAX		(SCHED_IDLEPRIO)
 #define SCHED_RANGE(policy)	((policy) <= SCHED_MAX)
 #endif
@@ -1545,9 +1545,19 @@ struct task_struct {
 
 #define MAX_USER_RT_PRIO	100
 #define MAX_RT_PRIO		MAX_USER_RT_PRIO
-
-#define MAX_PRIO		(MAX_RT_PRIO + 40)
 #define DEFAULT_PRIO		(MAX_RT_PRIO + 20)
+
+#ifdef CONFIG_SCHED_BFS
+#define PRIO_RANGE		(40)
+#define MAX_PRIO		(MAX_RT_PRIO + PRIO_RANGE)
+#define ISO_PRIO		(MAX_RT_PRIO)
+#define NORMAL_PRIO		(MAX_RT_PRIO + 1)
+#define IDLE_PRIO		(MAX_RT_PRIO + 2)
+#define PRIO_LIMIT		((IDLE_PRIO) + 1)
+#else /* CONFIG_SCHED_BFS */
+#define MAX_PRIO		(MAX_RT_PRIO + 40)
+#define NORMAL_PRIO		DEFAULT_PRIO
+#endif /* CONFIG_SCHED_BFS */
 
 static inline int rt_prio(int prio)
 {
