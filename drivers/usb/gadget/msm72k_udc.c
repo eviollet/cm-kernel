@@ -1253,8 +1253,9 @@ static void usb_do_work(struct work_struct *w)
 					printk(KERN_INFO "usb: notify offline\n");
 					ui->driver->disconnect(&ui->gadget);
 				}
-
+#ifdef CONFIG_ARCH_MSM_SCORPION
 				usb_phy_reset(ui);
+#endif
 
 				/* power down phy, clock down usb */
 				spin_lock_irqsave(&ui->lock, iflags);
@@ -1898,6 +1899,10 @@ int usb_gadget_unregister_driver(struct usb_gadget_driver *driver)
 
 	device_remove_file(&dev->gadget.dev, &dev_attr_wakeup);
 	driver->unbind(&dev->gadget);
+	if (dev->irq) {
+		free_irq(dev->irq, dev);
+		dev->irq = 0;
+	}
 	dev->gadget.dev.driver = NULL;
 	dev->driver = NULL;
 
