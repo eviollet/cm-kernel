@@ -28,6 +28,7 @@
 #include <linux/cpu.h>
 #include <linux/completion.h>
 #include <linux/mutex.h>
+#include <linux/earlysuspend.h>
 
 #define dprintk(msg...) cpufreq_debug_printk(CPUFREQ_DEBUG_CORE, \
 						"cpufreq-core", msg)
@@ -1986,6 +1987,25 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver)
 }
 EXPORT_SYMBOL_GPL(cpufreq_unregister_driver);
 
+static int	cpufreq_screen_state=1;
+int	cpufreq_get_screen_state(void) {
+  return(cpufreq_screen_state);
+}
+
+static void cpufreq_early_suspend(struct early_suspend *handler) {
+  cpufreq_screen_state=0;
+}
+
+static void cpufreq_late_resume(struct early_suspend *handler) {
+  cpufreq_screen_state=1;
+}
+
+static struct early_suspend cpufreq_power_suspend = {
+	.suspend = cpufreq_early_suspend,
+	.resume = cpufreq_late_resume,
+};
+
+
 static int __init cpufreq_core_init(void)
 {
 	int cpu;
@@ -1998,6 +2018,8 @@ static int __init cpufreq_core_init(void)
 	cpufreq_global_kobject = kobject_create_and_add("cpufreq",
 						&cpu_sysdev_class.kset.kobj);
 	BUG_ON(!cpufreq_global_kobject);
+
+	register_early_suspend(&cpufreq_power_suspend);	
 
 	return 0;
 }

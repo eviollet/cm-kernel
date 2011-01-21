@@ -416,6 +416,10 @@ void cpufreq_frequency_table_get_attr(struct cpufreq_frequency_table *table,
 
 void cpufreq_frequency_table_put_attr(unsigned int cpu);
 
+// Return current screen state
+// 0=>screen off
+// 1=>screen on
+int	cpufreq_get_screen_state(void);
 
 /*********************************************************************
  *                     UNIFIED DEBUG HELPERS                         *
