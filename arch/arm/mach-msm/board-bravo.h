@@ -172,6 +172,10 @@
 #define BRAVO_LCD_HSYNC              (137)
 #define BRAVO_LCD_DE                 (138)
 
+#define BRAVO_TPS65023_MIN_UV_MV    (800)
+#define BRAVO_TPS65023_MAX_UV_MV    (1350)
+
+
 /* know revision
    0x05 = CDMA lcd
    0x81 = GSM amoled

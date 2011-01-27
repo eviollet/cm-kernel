@@ -83,6 +83,7 @@ static int msm_cpufreq_init(struct cpufreq_policy *policy)
 #endif
 	policy->cpuinfo.transition_latency =
 		acpuclk_get_switch_time() * NSEC_PER_USEC;
+	//printk("msm_cpufreq_init(%d, %d\n", policy->min, policy->max);
 	return 0;
 }
 
@@ -103,6 +104,7 @@ static struct cpufreq_driver msm_cpufreq_driver = {
 
 static int __init msm_cpufreq_register(void)
 {
+  //printk("msm_cpufreq_register()\n");
 	return cpufreq_register_driver(&msm_cpufreq_driver);
 }
 
