@@ -13,11 +13,12 @@ do
     echo "************************************"
     echo "***** Make $kernel ...."
     echo "************************************"
-    cp .config-$kernel .config
+    fgrep -v "CONFIG_LOCALVERSION=" .config-$kernel > .config
     if [ ! $? -eq 0 ]
     then
 	exit
     fi
+    echo "CONFIG_LOCALVERSION=\"$kernelBaseName-$kernel\"" >> .config
 #    make clean
     make
     if [ ! $? -eq 0 ]
@@ -25,7 +26,7 @@ do
 	exit
     fi
     cp .config .config-$kernel
-    ./mkflash.sh
+    ./mkflash.sh $kernelBaseName-$kernel
     zipName=$kernelBaseName-$kernel.zip
     rm -f $zipName
     mv kernel.zip $zipName
