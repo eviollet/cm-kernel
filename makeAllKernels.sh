@@ -18,7 +18,7 @@ do
     then
 	exit
     fi
-    echo "CONFIG_LOCALVERSION=\"$kernelBaseName-$kernel\"" >> .config
+    echo "CONFIG_LOCALVERSION=\"-$kernelBaseName-$kernel\"" >> .config
 #    make clean
     make
     if [ ! $? -eq 0 ]
