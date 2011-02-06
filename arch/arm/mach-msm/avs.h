@@ -28,13 +28,17 @@
 
 #ifndef AVS_H
 #define AVS_H
+
+#include "board-bravo.h"
+
 #define	USE_OVERCLOCKING	1
 #define	USE_EXTREMEOVERCLOCKING	1
 
 //#define VOLTAGE_MIN  875 /* mV */
 //#define VOLTAGE_MIN  925 /* mV */
-#define VOLTAGE_MIN  900 /* mV */
-#define VOLTAGE_MAX  1350
+#define VOLTAGE_MIN  BRAVO_TPS65023_MIN_UV_MV /* mV */
+#define VOLTAGE_MAX  BRAVO_TPS65023_MAX_UV_MV
+#define	VOLTAGE_MIN_START	900	// Minimum value to start off with
 #define VOLTAGE_STEP 25
 
 int __init avs_init(int (*set_vdd)(int), u32 freq_cnt, u32 freq_idx);
@@ -50,7 +54,7 @@ u32 avs_get_avsdscr(void);
 u32 avs_get_tscsr(void);
 void     avs_set_tscsr(u32 to_tscsr);
 
-/*#define AVSDEBUG(x...) pr_info("AVS: " x);*/
+//#define AVSDEBUG(x...) pr_info("AVS: " x);
 #define AVSDEBUG(...)
 
 #endif /* AVS_H */

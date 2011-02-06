@@ -188,7 +188,7 @@ static DEFINE_SPINLOCK(acpu_lock);
 #define PLLMODE_NORMAL		7
 #define PLLMODE_MASK		7
 
-#ifdef CONFIG_CPU_FREQ_VDD_LEVELS
+#if defined(CONFIG_CPU_FREQ_VDD_LEVELS) && !defined(CONFIG_MSM_CPU_AVS)
 ssize_t acpuclk_get_vdd_levels_str(char *buf)
 {
 	int i, len = 0;
