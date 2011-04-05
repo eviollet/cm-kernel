@@ -60,6 +60,7 @@ struct clkctl_acpu_speed {
 	unsigned lpj;
 	int      vdd;
   unsigned axiclk_khz;
+  unsigned	ignore;	// Set to 1 if we are to ignore this frequency
 };
 
 static unsigned long max_axi_rate;
@@ -78,32 +79,32 @@ static unsigned long max_axi_rate;
 #define SRC_PLL1	3 /* 768 MHz */
 
 struct clkctl_acpu_speed acpu_freq_tbl[] = {
-  //  {  19200, CCTL(CLK_TCXO, 1),		SRC_RAW, 0, 0, 1050, 14000 },
-  { 128000, CCTL(CLK_TCXO, 1),		SRC_AXI, 0, 0, 1050, 14000 },
-  { 245000, CCTL(CLK_MODEM_PLL, 1),	SRC_RAW, 0, 0, 1050, 29000 },
-  //{ 256000, CCTL(CLK_GLOBAL_PLL, 3),	SRC_RAW, 0, 0, 1050, 29000 },
-  { 384000, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0A, 0, 1050, 58000 },
-  { 422400, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0B, 0, 1050, 117000 },
-  { 460800, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0C, 0, 1050, 117000 },
-  { 499200, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0D, 0, 1075, 117000 },
-  { 537600, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0E, 0, 1100, 117000 },
-  { 576000, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0F, 0, 1100, 117000 },
-  { 614400, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x10, 0, 1125, 117000 },
-  { 652800, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x11, 0, 1150, 117000 },
-  { 691200, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x12, 0, 1175, 117000 },
-  { 729600, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x13, 0, 1200, 117000 },
-  { 768000, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x14, 0, 1200, 128000 },
-  { 806400, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x15, 0, 1225, 128000 },
-  { 844800, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x16, 0, 1250, 128000 },
-  { 883200, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x17, 0, 1275, 128000 },
-  { 921600, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x18, 0, 1275, 128000 },
-  { 960000, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x19, 0, 1275, 128000 },
-  { 998400, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x1A, 0, 1275, 128000 },
-  { 1036800, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x1B, 0, 1275, 128000 },
-  { 1075200, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x1C, 0, 1275, 128000 },
-  { 1113600, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x1D, 0, 1275, 128000 },
-  { 1152000, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x1E, 0, 1300, 128000 }, 
-  { 1190400, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x1F, 0, 1300, 128000 }, 
+  {  19200, CCTL(CLK_TCXO, 1),		SRC_RAW, 0, 0, 1050, 14000, 1 },
+  { 128000, CCTL(CLK_TCXO, 1),		SRC_AXI, 0, 0, 1050, 14000 , 0 },
+  { 245000, CCTL(CLK_MODEM_PLL, 1),	SRC_RAW, 0, 0, 1050, 29000 , 0 },
+  { 256000, CCTL(CLK_GLOBAL_PLL, 3),	SRC_RAW, 0, 0, 1050, 29000 , 1 },
+  { 384000, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0A, 0, 1050, 58000 , 0 },
+  { 422400, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0B, 0, 1050, 117000 , 0 },
+  { 460800, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0C, 0, 1050, 117000 , 0 },
+  { 499200, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0D, 0, 1075, 117000 , 0 },
+  { 537600, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0E, 0, 1100, 117000 , 0 },
+  { 576000, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0F, 0, 1100, 117000 , 0 },
+  { 614400, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x10, 0, 1125, 117000 , 0 },
+  { 652800, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x11, 0, 1150, 117000 , 0 },
+  { 691200, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x12, 0, 1175, 117000 , 0 },
+  { 729600, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x13, 0, 1200, 117000 , 0 },
+  { 768000, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x14, 0, 1200, 128000 , 0 },
+  { 806400, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x15, 0, 1225, 128000 , 0 },
+  { 844800, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x16, 0, 1250, 128000 , 0 },
+  { 883200, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x17, 0, 1275, 128000 , 0 },
+  { 921600, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x18, 0, 1275, 128000 , 0 },
+  { 960000, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x19, 0, 1275, 128000 , 0 },
+  { 998400, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x1A, 0, 1275, 128000 , 0 },
+  { 1036800, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x1B, 0, 1275, 128000 , 0 },
+  { 1075200, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x1C, 0, 1275, 128000 , 0 },
+  { 1113600, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x1D, 0, 1275, 128000 , 0 },
+  { 1152000, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x1E, 0, 1300, 128000 , 0 }, 
+  { 1190400, CCTL(CLK_TCXO, 1), 		SRC_SCPLL, 0x1F, 0, 1300, 128000 , 0 }, 
 	{ 0 },
 };
 
@@ -132,9 +133,12 @@ static void __init acpuclk_init_cpufreq_table(void)
 		freq_table[i].frequency = CPUFREQ_ENTRY_INVALID;
 
 		/* Skip speeds using the global pll */
-		if (acpu_freq_tbl[i].acpu_khz == 256000 ||
+		if (acpu_freq_tbl[i].ignore==1) {
+		  continue;
+		}
+		/*if (acpu_freq_tbl[i].acpu_khz == 256000 ||
 				acpu_freq_tbl[i].acpu_khz == 19200)
-			continue;
+				continue;*/
 
 		vdd = acpu_freq_tbl[i].vdd;
 		/* Allow mpll and the first scpll speeds */
@@ -437,12 +441,27 @@ int acpuclk_set_rate(unsigned long rate, int for_power_collapse)
 	drv_state.current_speed = next;
 
 	spin_unlock_irqrestore(&acpu_lock, flags);
+	/*#ifdef CONFIG_AXI_SCREEN_POLICY
+	// In the case of AXI, disable 128Mhz when the screen is on
+	if ((cpufreq_get_screen_state()==1) && (table[index].frequency==128000)) {
+	  return 0;
+	}
+	#endif // CONFIG_AXI_SCREEN_POLICY*/
+
 #ifdef CONFIG_AXI_SCREEN_POLICY
 	if (!for_power_collapse) {
-	  if (cur->axiclk_khz != next->axiclk_khz)
-	    clk_set_rate(drv_state.clk_ebi1, next->axiclk_khz * 1000);
-	  DEBUG("acpuclk_set_rate switch axi to %d\n",
+	  /*if (((cur->axiclk_khz != next->axiclk_khz) && (cpufreq_get_screen_state())) ||
+	    (() && ())) {*/
+	  if ((cur->axiclk_khz!=next->axiclk_khz) &&
+	      (((cpufreq_get_screen_state()==1) && (next->axiclk_khz>14000)) ||
+	       ((cpufreq_get_screen_state()==0)))) {
+	    int	ret;
+	    ret=clk_set_rate(drv_state.clk_ebi1, next->axiclk_khz * 1000);
+	  DEBUG("acpuclk_set_rate try to switch axi to %d=>%d\n",
+		next->axiclk_khz * 1000, ret);
+	  DEBUG("acpuclk_set_rate switch axi to %lu\n",
 		clk_get_rate(drv_state.clk_ebi1));
+	  }
 	}
 #endif
 	if (!for_power_collapse) {

@@ -40,12 +40,12 @@ static int msm_cpufreq_target(struct cpufreq_policy *policy,
 	if (policy->cur == table[index].frequency)
 		return 0;
 
-#ifdef CONFIG_AXI_SCREEN_POLICY
+	/*#ifdef CONFIG_AXI_SCREEN_POLICY
 	// In the case of AXI, disable 128Mhz when the screen is on
 	if ((cpufreq_get_screen_state()==1) && (table[index].frequency==128000)) {
 	  return 0;
 	}
-#endif // CONFIG_AXI_SCREEN_POLICY
+	#endif // CONFIG_AXI_SCREEN_POLICY*/
 
 
 
