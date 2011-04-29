@@ -3041,10 +3041,10 @@ out:
 	/*
 	 * test_and_clear_bit() implies a memory barrier, paired with
 	 * the wmb() in fs/ioprio.c, so the value seen for ioprio is the
-	 * new one
+	 * new one.
 	 */
 	if (unlikely(test_and_clear_bit(IOC_CFQ_IOPRIO_CHANGED,
-			ioc->ioprio_changed)))
+					ioc->ioprio_changed)))
 		cfq_ioc_set_ioprio(ioc);
 
 #ifdef CONFIG_CFQ_GROUP_IOSCHED

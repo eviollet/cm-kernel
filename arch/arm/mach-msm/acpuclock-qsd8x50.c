@@ -448,13 +448,11 @@ int acpuclk_set_rate(unsigned long rate, int for_power_collapse)
 	}
 	#endif // CONFIG_AXI_SCREEN_POLICY*/
 
-#ifdef CONFIG_AXI_SCREEN_POLICY
+#ifndef CONFIG_AXI_SCREEN_POLICY
 	if (!for_power_collapse) {
 	  /*if (((cur->axiclk_khz != next->axiclk_khz) && (cpufreq_get_screen_state())) ||
 	    (() && ())) {*/
-	  if ((cur->axiclk_khz!=next->axiclk_khz) &&
-	      (((cpufreq_get_screen_state()==1) && (next->axiclk_khz>14000)) ||
-	       ((cpufreq_get_screen_state()==0)))) {
+    if (cur->axiclk_khz != next->axiclk_khz) {
 	    int	ret;
 	    ret=clk_set_rate(drv_state.clk_ebi1, next->axiclk_khz * 1000);
 	  DEBUG("acpuclk_set_rate try to switch axi to %d=>%d\n",
