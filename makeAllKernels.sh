@@ -29,6 +29,6 @@ do
     ./mkflash.sh $kernelBaseName-$kernel
     zipName=$kernelBaseName-$kernel.zip
     rm -f $zipName
-    mv kernel.zip $zipName
+    mv kernel-signed.zip $zipName
     cp $zipName /media/droopyTemp/DeFrostKernels
 done
