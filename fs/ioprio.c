@@ -60,17 +60,17 @@ int set_task_ioprio(struct task_struct *task, int ioprio)
 			err = -ENOMEM;
 			break;
 		}
-	/* let other ioc users see the new values */
+		/* let other ioc users see the new values */
 		smp_wmb();
 		task->io_context = ioc;
 	} while (1);
 
 	if (!err) {
 		ioc->ioprio = ioprio;
-	/* make sure schedulers see the new ioprio value */
-	wmb();
-	for (i = 0; i < IOC_IOPRIO_CHANGED_BITS; i++)
-		set_bit(i, ioc->ioprio_changed);
+		/* make sure schedulers see the new ioprio value */
+		wmb();
+		for (i = 0; i < IOC_IOPRIO_CHANGED_BITS; i++)
+			set_bit(i, ioc->ioprio_changed);
 	}
 
 	task_unlock(task);
