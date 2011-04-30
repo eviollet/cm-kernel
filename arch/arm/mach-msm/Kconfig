@@ -53,44 +53,6 @@ config MSM_MDP40
 	depends on ARCH_MSM7X30
 	default y
 
-config PERFLOCK
-  depends on CPU_FREQ
-  depends on ARCH_QSD8X50 || ARCH_MSM7X30 || ARCH_MSM7X00A || ARCH_MSM7227 || ARCH_MSM7225
-  default n
-  bool "HTC Performance Lock"
-
-config PERFLOCK_BOOT_LOCK
-  depends on PERFLOCK
-  depends on ARCH_QSD8X50 || ARCH_MSM7X30 || ARCH_MSM7X00A || ARCH_MSM7227 || ARCH_MSM7225
-  default n
-  bool "Boot Time Performance Lock"
-
-config PERFLOCK_SCREEN_POLICY
-  depends on PERFLOCK
-  depends on ARCH_QSD8X50 || ARCH_MSM7X00A || ARCH_MSM7227 || ARCH_MSM7225
-  default n
-  bool "Change Cpufreq Policy while Screen ON/OFF"
-
-config PERFLOCK_SCREEN_ON_MIN
-  depends on PERFLOCK_SCREEN_POLICY
-  int "Minimum speed while screen on"
-  default MSM_CPU_FREQ_MIN
-
-config PERFLOCK_SCREEN_ON_MAX
-  depends on PERFLOCK_SCREEN_POLICY
-  int "Maximum speed while screen on"
-  default MSM_CPU_FREQ_MAX
-
-config PERFLOCK_SCREEN_OFF_MIN
-  depends on PERFLOCK_SCREEN_POLICY
-  int "Minimum speed while screen off"
-  default MSM_CPU_FREQ_MIN
-
-config PERFLOCK_SCREEN_OFF_MAX
-  depends on PERFLOCK_SCREEN_POLICY
-  int "Maximum speed while screen off"
-  default MSM_CPU_FREQ_MAX
-
 config MSM_REMOTE_SPINLOCK_DEKKERS
 	bool
 
@@ -289,12 +251,9 @@ config HTC_PWRSINK
 	default y
 	bool "HTC Power Sink Driver"
 
--config QSD_SVS
-	bool "QSD Static Voltage Scaling"
-	depends on (ARCH_MSM_SCORPION)
-	default y
-	help
-	  Enables static voltage scaling using the TPS65023 PMIC.
+config HTC_POWER_COLLAPSE_MAGIC
+        default n
+        bool "Check Power Collapse State"
 
 config CACHE_FLUSH_RANGE_LIMIT
 	hex "Cache flush range limit"
@@ -496,7 +455,7 @@ if CPU_FREQ_MSM
 
 config MSM_CPU_FREQ_SET_MIN_MAX
         bool "Set Min/Max CPU frequencies."
-        default y
+        default n
         help
           Allow setting min and max CPU frequencies. Sysfs can be used
           to override these values.
@@ -517,7 +476,7 @@ config AXI_SCREEN_POLICY
         depends on ARCH_QSD8X50 || ARCH_MSM7X00A || ARCH_MSM7227 || ARCH_MSM7225
   depends on HAS_EARLYSUSPEND
   bool "Use higher AXI bus while screen ON"
-  default n
+  default y
   help
     Simple AXI scaling based on screen ON/OFF and PWRC.
 
@@ -613,5 +572,11 @@ config VIRTUAL_KPANIC_SRC
 	default "cache"
 	help
 	  Sets the partition to steal from to make the virtual one.
-	
+
+config HTC_OFFMODE_ALARM
+        bool "Enables HTC offmode alarm."
+        default n
+        help
+                support HTC offmode alarm.
+
 endif
