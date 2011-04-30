@@ -48,6 +48,9 @@
 #include <mach/bcm_bt_lpm.h>
 #include <mach/msm_smd.h>
 #include <mach/msm_flashlight.h>
+#ifdef CONFIG_PERFLOCK
+#include <mach/perflock.h>
+#endif
 #include <mach/vreg.h>
 #include <mach/board-bravo-microp-common.h>
 
@@ -78,7 +81,7 @@ static int bravo_phy_init_seq[] = {
 	0x31, 0x32,
 	0x1D, 0x0D,
 	0x1D, 0x10,
-	-1 
+	-1
 };
 
 static void bravo_usb_phy_reset(void)
@@ -140,11 +143,6 @@ static char *usb_functions_rndis[] = {
 	"rndis",
 };
 
-static char *usb_functions_rndis_adb[] = {
-	"rndis",
-	"adb",
-};
-
 #ifdef CONFIG_USB_ANDROID_DIAG
 static char *usb_functions_adb_diag[] = {
 	"usb_mass_storage",
@@ -183,13 +181,6 @@ static struct android_usb_product usb_products[] = {
 		.num_functions	= ARRAY_SIZE(usb_functions_rndis),
 		.functions	= usb_functions_rndis,
 	},
-	/*
-	XXX: there isn't a equivalent in htc's kernel
-	{
-		.product_id	= 0x4e14,
-		.num_functions	= ARRAY_SIZE(usb_functions_rndis_adb),
-		.functions	= usb_functions_rndis_adb,
-	}, */
 #ifdef CONFIG_USB_ANDROID_DIAG
 	{
 		.product_id	= 0x0c07,
@@ -383,19 +374,19 @@ static int bravo_ts_power(int on)
 	return 0;
 }
 
-static struct synaptics_i2c_rmi_platform_data bravo_synaptics_ts_data[] = {
+static struct synaptics_i2c_rmi_platform_data bravo_ts_data[] = {
 	{
-		.version = 0x100,
+		.version = 0x0100,
 		.power = bravo_ts_power,
-		.flags = SYNAPTICS_FLIP_Y | SYNAPTICS_SNAP_TO_INACTIVE_EDGE,
+		.sensitivity_adjust = 12,
+		.flags = SYNAPTICS_FLIP_Y  | SYNAPTICS_SNAP_TO_INACTIVE_EDGE,
 		.inactive_left = -1 * 0x10000 / 480,
 		.inactive_right = -1 * 0x10000 / 480,
 		.inactive_top = -5 * 0x10000 / 800,
 		.inactive_bottom = -5 * 0x10000 / 800,
-		.sensitivity_adjust = 12,
 		.dup_threshold = 10,
 		.margin_inactive_pixel = {8, 32, 32, 8},
-	}
+	},
 };
 
 static struct akm8973_platform_data compass_platform_data = {
@@ -458,7 +449,6 @@ static void ds2482_set_slp_n(unsigned n)
 	gpio_direction_output(BRAVO_GPIO_DS2482_SLP_N, n);
 }
 
-//static int capella_cm3602_power(int on);
 static int capella_cm3602_power(int pwr_device, uint8_t enable);
 static struct microp_function_config microp_functions[] = {
 	{
@@ -502,7 +492,7 @@ static struct tpa2018d1_platform_data tpa2018_data = {
 static struct i2c_board_info base_i2c_devices[] = {
 	{
 		I2C_BOARD_INFO(SYNAPTICS_I2C_RMI_NAME, 0x40),
-		.platform_data = bravo_synaptics_ts_data,
+		.platform_data = &bravo_ts_data,
 		.irq = MSM_GPIO_TO_INT(BRAVO_GPIO_TP_INT_N)
 	},
 	{
@@ -857,7 +847,7 @@ static void curcial_oj_shutdown(int enable)
 	cmd[2] = 0x20;
 	// microp firmware(v04) non-shutdown by default
 	microp_i2c_write(0x90, cmd, 3);
-	pr_err("%s\n", __func__);	
+	pr_err("%s\n", __func__);
 }
 
 #define CURCIAL_OJ_POWER		150
@@ -1134,10 +1124,23 @@ static struct msm_acpu_clock_platform_data bravo_cdma_clock_data = {
 	.mpll_khz		= 235930
 };
 
+#ifdef CONFIG_PERFLOCK
+static unsigned bravo_perf_acpu_table[] = {
+	192000000,
+	576000000,
+	998400000,
+};
+
+static struct perflock_platform_data bravo_perflock_data = {
+	.perf_acpu_table = bravo_perf_acpu_table,
+	.table_size = ARRAY_SIZE(bravo_perf_acpu_table),
+};
+#endif
+
 static void bravo_reset(void)
 {
 	gpio_set_value(BRAVO_GPIO_PS_HOLD, 0);
-}
+};
 
 int bravo_init_mmc(int sysrev, unsigned debug_uart);
 
@@ -1163,6 +1166,10 @@ static void __init bravo_init(void)
 		msm_acpu_clock_init(&bravo_cdma_clock_data);
 	else
 		msm_acpu_clock_init(&bravo_clock_data);
+
+#ifdef CONFIG_PERFLOCK
+	perflock_init(&bravo_perflock_data);
+#endif
 
 	msm_serial_debug_init(MSM_UART1_PHYS, INT_UART1,
 			      &msm_device_uart1.dev, 1, MSM_GPIO_TO_INT(139));
@@ -1226,10 +1233,8 @@ static void __init bravo_fixup(struct machine_desc *desc, struct tag *tags,
 {
 	mi->nr_banks = 2;
 	mi->bank[0].start = PHYS_OFFSET;
-	mi->bank[0].node = PHYS_TO_NID(PHYS_OFFSET);
 	mi->bank[0].size = MSM_EBI1_BANK0_SIZE;
 	mi->bank[1].start = MSM_EBI1_BANK1_BASE;
-	mi->bank[1].node = PHYS_TO_NID(MSM_EBI1_BANK1_BASE);
 	mi->bank[1].size = MSM_EBI1_BANK1_SIZE;
 }
 
@@ -1245,10 +1250,6 @@ extern struct sys_timer msm_timer;
 MACHINE_START(BRAVO, "bravo")
 #else
 MACHINE_START(BRAVOC, "bravoc")
-#endif
-#ifdef CONFIG_MSM_DEBUG_UART
-	.phys_io	= MSM_DEBUG_UART_PHYS,
-	.io_pg_offst	= ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
 #endif
 	.boot_params	= 0x20000100,
 	.fixup		= bravo_fixup,

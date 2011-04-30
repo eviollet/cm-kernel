@@ -652,7 +652,7 @@ static ssize_t show_scaling_setspeed(struct cpufreq_policy *policy, char *buf)
 
 #ifdef CONFIG_CPU_FREQ_VDD_LEVELS
 #ifdef CONFIG_MSM_CPU_AVS
-extern ssize_t acpuclk_get_vdd_levels_havs_str(char *buf);
+/*extern ssize_t acpuclk_get_vdd_levels_havs_str(char *buf);
 static ssize_t show_vdd_levels_havs(struct cpufreq_policy *policy, char *buf)
 {
 	return acpuclk_get_vdd_levels_havs_str(buf);
@@ -717,7 +717,7 @@ static ssize_t store_vdd_levels_havs(struct cpufreq_policy *policy, const char *
   }
 
   return count;
-}
+}*/
 #else
 extern ssize_t acpuclk_get_vdd_levels_str(char *buf);
 static ssize_t show_vdd_levels(struct cpufreq_policy *policy, char *buf)
@@ -817,7 +817,7 @@ cpufreq_freq_attr_rw(scaling_governor);
 cpufreq_freq_attr_rw(scaling_setspeed);
 #ifdef CONFIG_CPU_FREQ_VDD_LEVELS
 #ifdef CONFIG_MSM_CPU_AVS
-cpufreq_freq_attr_rw(vdd_levels_havs);
+/*cpufreq_freq_attr_rw(vdd_levels_havs);*/
 #else
 cpufreq_freq_attr_rw(vdd_levels);
 #endif // AVS
@@ -837,7 +837,7 @@ static struct attribute *default_attrs[] = {
 	&scaling_setspeed.attr,
 #ifdef CONFIG_CPU_FREQ_VDD_LEVELS
 #ifdef CONFIG_MSM_CPU_AVS
-	&vdd_levels_havs.attr,
+/*	&vdd_levels_havs.attr,*/
 #else
 	&vdd_levels.attr,
 #endif // AVS
@@ -2150,25 +2150,6 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver)
 }
 EXPORT_SYMBOL_GPL(cpufreq_unregister_driver);
 
-static int	cpufreq_screen_state=1;
-int	cpufreq_get_screen_state(void) {
-  return(cpufreq_screen_state);
-}
-
-static void cpufreq_early_suspend(struct early_suspend *handler) {
-  cpufreq_screen_state=0;
-}
-
-static void cpufreq_late_resume(struct early_suspend *handler) {
-  cpufreq_screen_state=1;
-}
-
-static struct early_suspend cpufreq_power_suspend = {
-	.suspend = cpufreq_early_suspend,
-	.resume = cpufreq_late_resume,
-};
-
-
 static int __init cpufreq_core_init(void)
 {
 	int cpu;
@@ -2181,8 +2162,6 @@ static int __init cpufreq_core_init(void)
 	cpufreq_global_kobject = kobject_create_and_add("cpufreq",
 						&cpu_sysdev_class.kset.kobj);
 	BUG_ON(!cpufreq_global_kobject);
-
-	register_early_suspend(&cpufreq_power_suspend);	
 
 	return 0;
 }

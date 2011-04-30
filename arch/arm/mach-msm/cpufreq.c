@@ -40,16 +40,6 @@ static int msm_cpufreq_target(struct cpufreq_policy *policy,
 	if (policy->cur == table[index].frequency)
 		return 0;
 
-	/*#ifdef CONFIG_AXI_SCREEN_POLICY
-	// In the case of AXI, disable 128Mhz when the screen is on
-	if ((cpufreq_get_screen_state()==1) && (table[index].frequency==128000)) {
-	  return 0;
-	}
-	#endif // CONFIG_AXI_SCREEN_POLICY*/
-
-
-
-
 #ifdef CONFIG_CPU_FREQ_DEBUG
 	printk("msm_cpufreq_target %d r %d (%d-%d) selected %d\n", target_freq,
 		relation, policy->min, policy->max, table[index].frequency);
@@ -83,7 +73,6 @@ static int msm_cpufreq_init(struct cpufreq_policy *policy)
 #endif
 	policy->cpuinfo.transition_latency =
 		acpuclk_get_switch_time() * NSEC_PER_USEC;
-	//printk("msm_cpufreq_init(%d, %d\n", policy->min, policy->max);
 	return 0;
 }
 
@@ -104,7 +93,6 @@ static struct cpufreq_driver msm_cpufreq_driver = {
 
 static int __init msm_cpufreq_register(void)
 {
-  //printk("msm_cpufreq_register()\n");
 	return cpufreq_register_driver(&msm_cpufreq_driver);
 }
 

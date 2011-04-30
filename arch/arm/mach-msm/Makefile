@@ -11,13 +11,13 @@ obj-$(CONFIG_MSM_CPU_AVS) += avs.o avs_hw.o
 obj-y += clock.o clock-pcom.o
 obj-y += gpio.o generic_gpio.o
 obj-y += nand_partitions.o
-obj-y += htc_board_tags.o
 
 obj-$(CONFIG_ARCH_QSD8X50) += sirc.o
 obj-$(CONFIG_MSM_FIQ_SUPPORT) += fiq_glue.o
 obj-$(CONFIG_MSM_SMD) += smd.o smd_debug.o
 obj-$(CONFIG_MSM_SMD) += smd_tty.o smd_qmi.o
-obj-$(CONFIG_MSM_SMD) += last_radio_log.o
+obj-$(CONFIG_MSM_SMD) += last_radio_log.o 
+obj-$(CONFIG_MSM_SMD) += smem_log.o
 obj-$(CONFIG_MSM_DAL) += dal.o
 obj-$(CONFIG_MSM_ONCRPCROUTER) += smd_rpcrouter.o
 obj-$(CONFIG_MSM_ONCRPCROUTER) += smd_rpcrouter_device.o
@@ -76,6 +76,7 @@ obj-$(CONFIG_MACH_BRAVO) += board-bravo-microp.o
 obj-$(CONFIG_MACH_BRAVO) += htc_acoustic_qsd.o
 obj-$(CONFIG_MACH_BRAVO) += board-bravo-tpa2018d1.o
 obj-$(CONFIG_MACH_BRAVO) += board-bravo-smb329.o
+obj-$(CONFIG_MACH_BRAVO) += devices_htc.o
 
 obj-$(CONFIG_MACH_BRAVOC) += board-bravo.o board-bravo-panel.o
 obj-$(CONFIG_MACH_BRAVOC) += board-bravo-keypad.o board-bravo-mmc.o
@@ -86,6 +87,7 @@ obj-$(CONFIG_MACH_BRAVOC) += board-bravo-microp.o
 obj-$(CONFIG_MACH_BRAVOC) += htc_acoustic_qsd.o
 obj-$(CONFIG_MACH_BRAVOC) += board-bravo-tpa2018d1.o
 obj-$(CONFIG_MACH_BRAVOC) += board-bravo-smb329.o
+obj-$(CONFIG_MACH_BRAVOC) += devices_htc.o
 
 obj-$(CONFIG_HTC_PWRSINK) += htc_pwrsink.o
 obj-$(CONFIG_HTC_PWRSPLY) += htc_power_supply.o
