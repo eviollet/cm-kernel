@@ -34,7 +34,9 @@
 #include "acpuclock.h"
 #include "proc_comm.h"
 #include "clock.h"
+#ifdef CONFIG_MSM_CPU_AVS
 #include "avs.h"
+#endif // CONFIG_MSM_CPU_AVS
 #ifdef CONFIG_HAS_WAKELOCK
 #include <linux/wakelock.h>
 #endif
@@ -303,8 +305,10 @@ static int msm_sleep(int sleep_mode, uint32_t sleep_delay, int from_idle)
 		printk(KERN_INFO "msm_sleep(): mode %d delay %u idle %d\n",
 		       sleep_mode, sleep_delay, from_idle);
 
+#ifdef CONFIG_MSM_CPU_AVS
 	if(avs_enabled() && !from_idle)
 		avs_set_default_vdds();
+#endif // CONFIG_MSM_CPU_AVS
 
 #ifndef CONFIG_ARCH_MSM_SCORPION
 	switch (sleep_mode) {
@@ -445,9 +449,11 @@ static int msm_sleep(int sleep_mode, uint32_t sleep_delay, int from_idle)
 			local_fiq_enable();
 			rv = 0;
 			// after power collapse the avs delays need to be reinitialised
+#ifdef CONFIG_MSM_CPU_AVS
 			if(avs_enabled()) {
 				avs_enable(1);
 			}
+#endif // CONFIG_MSM_CPU_AVS
 		}
 		if (msm_pm_debug_mask & MSM_PM_DEBUG_POWER_COLLAPSE)
 			printk(KERN_INFO "msm_pm_collapse(): returned %d\n",
