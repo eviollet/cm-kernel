@@ -41,6 +41,9 @@
 
 extern int is_ac_power_supplied(void);
 
+static int enable_charge=1;
+module_param(enable_charge, int, S_IRUGO | S_IWUSR | S_IWGRP);
+
 struct battery_status {
 	int timestamp;
 
@@ -85,8 +88,8 @@ struct battery_status {
  * gauge every FAST_POLL seconds.  If we're asleep and on battery
  * power, sample every SLOW_POLL seconds
  */
-#define SLOW_POLL	(10 * 60)
 #define FAST_POLL	(1 * 60)
+#define SLOW_POLL	(10 * 60)
 
 static DEFINE_MUTEX(battery_log_lock);
 static struct battery_status battery_log[BATTERY_LOG_MAX];
@@ -154,6 +157,8 @@ struct ds2784_device_info {
 	ktime_t last_poll;
 	ktime_t last_charge_seen;
 };
+
+struct ds2784_device_info *the_di;
 
 #define psy_to_dev_info(x) container_of((x), struct ds2784_device_info, bat)
 
@@ -791,19 +796,29 @@ static int battery_adjust_charge_state(struct ds2784_device_info *di)
 	 */
 	charge_mode = source;
 
-	//pr_info("source=%d, volt=%d, batt_full=%d\n", 
-	//	source, volt, di->status.battery_full);
+	if(!enable_charge)
+		charge_mode = CHARGE_OFF;
 
 	/* shut off charger when full:
 	 * - CHGTF flag is set
+	 * - battery drawing less than 80mA
+	 * - battery at 100% capacity
+	 *
+	 * We don't move from full to not-full until
+	 * we drop below 95%, to avoid confusing the
+	 * user while we're maintaining a full charge
+	 * (slowly draining to 95 and charging back
+	 * to 100)
 	 */
-	if ((di->status.status_reg & 0x80) && (di->status.percentage>99)) {
+	if (di->status.percentage < 99)  {
+		di->status.battery_full = 0;
+	}
+	if (enable_charge && (di->status.status_reg & 0x80) &&
+	((di->status.current_avg_uA/1000) <= 40) &&
+	(di->status.percentage == 100)) {	
 		di->status.battery_full = 1;
 		charge_mode = CHARGE_BATT_DISABLE;
-	}
-	else
-		di->status.battery_full = 0;
-
+	} 
 
 	if (temp >= TEMP_HOT) {
 		if (temp >= TEMP_CRITICAL)
@@ -827,7 +842,7 @@ static int battery_adjust_charge_state(struct ds2784_device_info *di)
 			charge_mode = CHARGE_BATT_DISABLE;
 	}
 
-	if (di->status.current_uA > 1024)
+	if (di->status.battery_full == 1)
 		di->last_charge_seen = di->last_poll;
 	else if (di->last_charge_mode != CHARGE_OFF &&
 		 check_timeout(di->last_poll, di->last_charge_seen, 60 * 60)) {
@@ -1148,6 +1163,19 @@ static int __init ds2784_battery_init(void)
 	wake_lock_init(&vbus_wake_lock, WAKE_LOCK_SUSPEND, "vbus_present");
 	return platform_driver_register(&ds2784_battery_driver);
 }
+
+static int set_charging(const char *val, struct kernel_param *kp) {
+	battery_adjust_charge_state(the_di);
+        return 0;
+}
+
+int get_battery(char *buffer, struct kernel_param *kp) {
+	struct battery_status *s=&(the_di->status);
+	ds2784_battery_read_status(the_di);
+        return sprintf(buffer,"V=%d I=%d Iav=%d C=%d",s->voltage_uV, s->current_uA, s->current_avg_uA, s->charge_uAh);
+}
+
+module_param_call(battery, set_charging, get_battery, NULL, S_IWUSR | S_IRUSR);
 
 module_init(ds2784_battery_init);
 

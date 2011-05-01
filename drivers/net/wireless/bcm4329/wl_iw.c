@@ -21,7 +21,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wl_iw.c,v 1.51.4.9.2.6.4.142.4.61 2010/12/03 22:09:41 Exp $
+ * $Id: wl_iw.c,v 1.51.4.9.2.6.4.142.4.69 2010/12/21 03:00:08 Exp $
  */
 
 
@@ -114,6 +114,10 @@ static int wl_iw_softap_deassoc_stations(struct net_device *dev, u8 *mac);
 static int		g_onoff = G_WLAN_SET_ON;
 wl_iw_extra_params_t	g_wl_iw_params;
 static struct mutex	wl_cache_lock;
+
+#ifdef CONFIG_US_NON_DFS_CHANNELS_ONLY
+static bool use_non_dfs_channels = true;
+#endif
 
 extern bool wl_iw_conn_status_str(uint32 event_type, uint32 status,
 	uint32 reason, char* stringBuf, uint buflen);
@@ -224,7 +228,7 @@ typedef struct iscan_info {
 	wl_iscan_params_t *iscan_ex_params_p;
 	int iscan_ex_param_size;
 } iscan_info_t;
-#define COEX_DHCP 1 
+#define COEX_DHCP 1
 
 #define BT_DHCP_eSCO_FIX
 #define BT_DHCP_USE_FLAGS
@@ -615,6 +619,31 @@ wl_iw_get_macaddr(
 	return error;
 }
 
+static int
+wl_iw_set_country_code(struct net_device *dev, char *ccode)
+{
+	char country_code[WLC_CNTRY_BUF_SZ];
+	int ret = -1;
+
+	WL_TRACE(("%s\n", __FUNCTION__));
+	if (!ccode)
+		ccode = dhd_bus_country_get(dev);
+	strncpy(country_code, ccode, sizeof(country_code));
+	if (ccode && (country_code[0] != 0)) {
+#ifdef CONFIG_US_NON_DFS_CHANNELS_ONLY
+		if (use_non_dfs_channels && !strncmp(country_code, "US", 2))
+			strncpy(country_code, "Q2", WLC_CNTRY_BUF_SZ);
+		if (!use_non_dfs_channels && !strncmp(country_code, "Q2", 2))
+			strncpy(country_code, "US", WLC_CNTRY_BUF_SZ);
+#endif
+		ret = dev_wlc_ioctl(dev, WLC_SET_COUNTRY, &country_code, sizeof(country_code));
+		if (ret >= 0) {
+			WL_TRACE(("%s: set country %s OK\n", __FUNCTION__, country_code));
+			dhd_bus_country_set(dev, &country_code[0]);
+		}
+	}
+	return ret;
+}
 
 static int
 wl_iw_set_country(
@@ -639,15 +668,10 @@ wl_iw_set_country(
 	if (country_offset != 0) {
 		strncpy(country_code, extra + country_offset + 1,
 			MIN(country_code_size, sizeof(country_code)));
-#ifdef CONFIG_US_NON_DFS_CHANNELS_ONLY
-		if (!strncmp(country_code, "US", 2))
-			strncpy(country_code, "Q2", WLC_CNTRY_BUF_SZ);
-#endif
-		if ((error = dev_wlc_ioctl(dev, WLC_SET_COUNTRY,
-			&country_code, sizeof(country_code))) >= 0) {
+		error = wl_iw_set_country_code(dev, country_code);
+		if (error >= 0) {
 			p += snprintf(p, MAX_WX_STRING, "OK");
 			WL_TRACE(("%s: set country %s OK\n", __FUNCTION__, country_code));
-			dhd_bus_country_set(dev, &country_code[0]);
 			goto exit;
 		}
 	}
@@ -725,7 +749,7 @@ static bool btcoex_is_sco_active(struct net_device *dev)
 	if (ioc_res == 0) {
 		WL_TRACE_COEX(("%s: read btc_params[4] = %x\n", __FUNCTION__, temp));
 
-		if (temp > 0xea0) {
+		if ((temp > 0xea0) && (temp < 0xed8)) {
 			WL_TRACE_COEX(("%s: BT SCO/eSCO is ACTIVE\n", __FUNCTION__));
 			res = true;
 		} else {
@@ -902,7 +926,6 @@ wl_iw_set_btcoex_dhcp(
 		   (!dev_wlc_intvar_get_reg(dev, "btc_params", 66,  &saved_reg66)) &&
 		   (!dev_wlc_intvar_get_reg(dev, "btc_params", 41,  &saved_reg41)) &&
 		   (!dev_wlc_intvar_get_reg(dev, "btc_params", 68,  &saved_reg68))) {
-			saved_status = TRUE;
 			WL_TRACE_COEX(("save regs {66,41,68} ->: 0x%x 0x%x 0x%x\n", \
 				saved_reg66, saved_reg41, saved_reg68));
 
@@ -910,18 +933,25 @@ wl_iw_set_btcoex_dhcp(
 			dev_wlc_ioctl(dev, WLC_SET_PM, &pm_local, sizeof(pm_local));
 #endif
 
-			dev_wlc_bufvar_set(dev, "btc_params", \
-				(char *)&buf_reg66va_dhcp_on[0], sizeof(buf_reg66va_dhcp_on));
-			dev_wlc_bufvar_set(dev, "btc_params", \
-				(char *)&buf_reg41va_dhcp_on[0], sizeof(buf_reg41va_dhcp_on));
-			dev_wlc_bufvar_set(dev, "btc_params", \
-				(char *)&buf_reg68va_dhcp_on[0], sizeof(buf_reg68va_dhcp_on));
+				if (btcoex_is_sco_active(dev)) {
 
-			if (btcoex_is_sco_active(dev)) {
-				g_bt->bt_state = BT_DHCP_START;
-				g_bt->timer_on = 1;
-				mod_timer(&g_bt->timer, g_bt->timer.expires);
-				WL_TRACE_COEX(("%s enable BT DHCP Timer\n", \
+					dev_wlc_bufvar_set(dev, "btc_params", \
+						(char *)&buf_reg66va_dhcp_on[0], \
+						 sizeof(buf_reg66va_dhcp_on));
+
+					dev_wlc_bufvar_set(dev, "btc_params", \
+						(char *)&buf_reg41va_dhcp_on[0], \
+						 sizeof(buf_reg41va_dhcp_on));
+
+					dev_wlc_bufvar_set(dev, "btc_params", \
+						(char *)&buf_reg68va_dhcp_on[0], \
+						 sizeof(buf_reg68va_dhcp_on));
+					saved_status = TRUE;
+
+					g_bt->bt_state = BT_DHCP_START;
+					g_bt->timer_on = 1;
+					mod_timer(&g_bt->timer, g_bt->timer.expires);
+					WL_TRACE_COEX(("%s enable BT DHCP Timer\n", \
 					__FUNCTION__));
 			}
 		}
@@ -952,10 +982,10 @@ wl_iw_set_btcoex_dhcp(
 			}
 		}
 
-		dev_wlc_bufvar_set(dev, "btc_flags", \
+		if (saved_status == TRUE) {
+			dev_wlc_bufvar_set(dev, "btc_flags", \
 				(char *)&buf_flag7_default[0], sizeof(buf_flag7_default));
 
-		if (saved_status) {
 			regaddr = 66;
 			dev_wlc_intvar_set_reg(dev, "btc_params", \
 				(char *)&regaddr, (char *)&saved_reg66);
@@ -1012,6 +1042,22 @@ wl_iw_set_suspend(
 
 	return ret;
 }
+
+#ifdef CONFIG_US_NON_DFS_CHANNELS_ONLY
+static int
+wl_iw_set_dfs_channels(
+	struct net_device *dev,
+	struct iw_request_info *info,
+	union iwreq_data *wrqu,
+	char *extra
+)
+{
+	use_non_dfs_channels = *(extra + strlen(SETDFSCHANNELS_CMD) + 1) - '0';
+	use_non_dfs_channels = (use_non_dfs_channels != 0) ? false : true;
+	wl_iw_set_country_code(dev, NULL);
+	return 0;
+}
+#endif
 
 int
 wl_format_ssid(char* ssid_buf, uint8* ssid, int ssid_len)
@@ -3640,6 +3686,7 @@ wl_iw_handle_scanresults_ies(char **event_p, char *end,
 			wpa_snprintf_hex(buf + 10, 2+1, &(ie->len), 1);
 			wpa_snprintf_hex(buf + 12, 2*ie->len+1, ie->data, ie->len);
 			event = IWE_STREAM_ADD_POINT(info, event, end, &iwe, buf);
+			kfree(buf);
 #endif 
 			break;
 		}
@@ -4738,7 +4785,7 @@ wl_iw_set_power(
 
 	WL_TRACE(("%s: SIOCSIWPOWER\n", dev->name));
 
-	pm = vwrq->disabled ? PM_OFF : PM_MAX;
+	pm = vwrq->disabled ? PM_OFF : PM_FAST;
 
 	pm = htod32(pm);
 	if ((error = dev_wlc_ioctl(dev, WLC_SET_PM, &pm, sizeof(pm))))
@@ -7057,22 +7104,26 @@ static int wl_iw_set_priv(
 			ret = wl_iw_set_country(dev, info, (union iwreq_data *)dwrq, extra);
 		else if (strnicmp(extra, "STOP", strlen("STOP")) == 0)
 			ret = wl_iw_control_wl_off(dev, info);
-	    else if (strnicmp(extra, BAND_GET_CMD, strlen(BAND_GET_CMD)) == 0)
+		else if (strnicmp(extra, BAND_GET_CMD, strlen(BAND_GET_CMD)) == 0)
 			ret = wl_iw_get_band(dev, info, (union iwreq_data *)dwrq, extra);
-	    else if (strnicmp(extra, BAND_SET_CMD, strlen(BAND_SET_CMD)) == 0)
+		else if (strnicmp(extra, BAND_SET_CMD, strlen(BAND_SET_CMD)) == 0)
 			ret = wl_iw_set_band(dev, info, (union iwreq_data *)dwrq, extra);
-	    else if (strnicmp(extra, DTIM_SKIP_GET_CMD, strlen(DTIM_SKIP_GET_CMD)) == 0)
+		else if (strnicmp(extra, DTIM_SKIP_GET_CMD, strlen(DTIM_SKIP_GET_CMD)) == 0)
 			ret = wl_iw_get_dtim_skip(dev, info, (union iwreq_data *)dwrq, extra);
-	    else if (strnicmp(extra, DTIM_SKIP_SET_CMD, strlen(DTIM_SKIP_SET_CMD)) == 0)
+		else if (strnicmp(extra, DTIM_SKIP_SET_CMD, strlen(DTIM_SKIP_SET_CMD)) == 0)
 			ret = wl_iw_set_dtim_skip(dev, info, (union iwreq_data *)dwrq, extra);
-	    else if (strnicmp(extra, SETSUSPEND_CMD, strlen(SETSUSPEND_CMD)) == 0)
+		else if (strnicmp(extra, SETSUSPEND_CMD, strlen(SETSUSPEND_CMD)) == 0)
 			ret = wl_iw_set_suspend(dev, info, (union iwreq_data *)dwrq, extra);
+#ifdef CONFIG_US_NON_DFS_CHANNELS_ONLY
+		else if (strnicmp(extra, SETDFSCHANNELS_CMD, strlen(SETDFSCHANNELS_CMD)) == 0)
+			ret = wl_iw_set_dfs_channels(dev, info, (union iwreq_data *)dwrq, extra);
+#endif
 #if defined(PNO_SUPPORT)
-	    else if (strnicmp(extra, PNOSSIDCLR_SET_CMD, strlen(PNOSSIDCLR_SET_CMD)) == 0)
+		else if (strnicmp(extra, PNOSSIDCLR_SET_CMD, strlen(PNOSSIDCLR_SET_CMD)) == 0)
 			ret = wl_iw_set_pno_reset(dev, info, (union iwreq_data *)dwrq, extra);
-	    else if (strnicmp(extra, PNOSETUP_SET_CMD, strlen(PNOSETUP_SET_CMD)) == 0)
+		else if (strnicmp(extra, PNOSETUP_SET_CMD, strlen(PNOSETUP_SET_CMD)) == 0)
 			ret = wl_iw_set_pno_set(dev, info, (union iwreq_data *)dwrq, extra);
-	    else if (strnicmp(extra, PNOENABLE_SET_CMD, strlen(PNOENABLE_SET_CMD)) == 0)
+		else if (strnicmp(extra, PNOENABLE_SET_CMD, strlen(PNOENABLE_SET_CMD)) == 0)
 			ret = wl_iw_set_pno_enable(dev, info, (union iwreq_data *)dwrq, extra);
 #endif
 #if defined(CSCAN)
@@ -8266,5 +8317,4 @@ void wl_iw_detach(void)
 		wl_iw_send_priv_event(priv_dev, "AP_DOWN");
 	}
 #endif
-
 }

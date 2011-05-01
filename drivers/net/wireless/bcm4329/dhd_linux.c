@@ -528,7 +528,7 @@ static void dhd_set_packet_filter(int value, dhd_pub_t *dhd)
 #if defined(CONFIG_HAS_EARLYSUSPEND)
 static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 {
-	int power_mode = PM_MAX;
+	int power_mode = PM_FAST;
 	/* wl_pkt_filter_enable_t	enable_parm; */
 	char iovbuf[32];
 	int bcn_li_dtim = 3;
@@ -1904,7 +1904,7 @@ dhd_open(struct net_device *net)
 	ifidx = dhd_net2idx(dhd, net);
 	DHD_TRACE(("%s: ifidx %d\n", __FUNCTION__, ifidx));
 
-	if (ifidx >= 0 && (dhd->iflist[ifidx]) && (dhd->iflist[ifidx]->state == WLC_E_IF_DEL)) {
+	if ((dhd->iflist[ifidx]) && (dhd->iflist[ifidx]->state == WLC_E_IF_DEL)) {
 		DHD_ERROR(("%s: Error: called when IF already deleted\n", __FUNCTION__));
 		return -1;
 	}
@@ -2185,12 +2185,15 @@ dhd_bus_start(dhd_pub_t *dhdp)
 
 	DHD_TRACE(("%s: \n", __FUNCTION__));
 
+	dhd_os_sdlock(dhdp);
+
 	/* try to download image and nvram to the dongle */
 	if  (dhd->pub.busstate == DHD_BUS_DOWN) {
 		if (!(dhd_bus_download_firmware(dhd->pub.bus, dhd->pub.osh,
 		                                fw_path, nv_path))) {
 			DHD_ERROR(("%s: dhdsdio_probe_download failed. firmware = %s nvram = %s\n",
 			           __FUNCTION__, fw_path, nv_path));
+			dhd_os_sdunlock(dhdp);
 			return -1;
 		}
 	}
@@ -2200,8 +2203,9 @@ dhd_bus_start(dhd_pub_t *dhdp)
 	dhd_os_wd_timer(&dhd->pub, dhd_watchdog_ms);
 
 	/* Bring up the bus */
-	if ((ret = dhd_bus_init(&dhd->pub, TRUE)) != 0) {
+	if ((ret = dhd_bus_init(&dhd->pub, FALSE)) != 0) {
 		DHD_ERROR(("%s, dhd_bus_init failed %d\n", __FUNCTION__, ret));
+		dhd_os_sdunlock(dhdp);
 		return ret;
 	}
 #if defined(OOB_INTR_ONLY)
@@ -2210,6 +2214,7 @@ dhd_bus_start(dhd_pub_t *dhdp)
 		dhd->wd_timer_valid = FALSE;
 		del_timer_sync(&dhd->timer);
 		DHD_ERROR(("%s Host failed to resgister for OOB\n", __FUNCTION__));
+		dhd_os_sdunlock(dhdp);
 		return -ENODEV;
 	}
 
@@ -2222,8 +2227,11 @@ dhd_bus_start(dhd_pub_t *dhdp)
 		dhd->wd_timer_valid = FALSE;
 		del_timer_sync(&dhd->timer);
 		DHD_ERROR(("%s failed bus is not ready\n", __FUNCTION__));
+		dhd_os_sdunlock(dhdp);
 		return -ENODEV;
 	}
+
+	dhd_os_sdunlock(dhdp);
 
 #ifdef EMBEDDED_PLATFORM
 	bcm_mkiovar("event_msgs", dhdp->eventmask, WL_EVENTING_MASK_LEN, iovbuf, sizeof(iovbuf));
@@ -3075,6 +3083,15 @@ void dhd_bus_country_set(struct net_device *dev, char *country_code)
 
 	if (dhd && dhd->pub.up)
 		strncpy(dhd->pub.country_code, country_code, WLC_CNTRY_BUF_SZ);
+}
+
+char *dhd_bus_country_get(struct net_device *dev)
+{
+	dhd_info_t *dhd = *(dhd_info_t **)netdev_priv(dev);
+
+	if (dhd && (dhd->pub.country_code[0] != 0))
+		return dhd->pub.country_code;
+	return NULL;
 }
 
 void dhd_os_start_lock(dhd_pub_t *pub)

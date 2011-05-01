@@ -1,4 +1,0 @@
-config TIWLAN1251
-        bool "TIWLAN1251 WiFi Module"
-        default n
-        depends on m
