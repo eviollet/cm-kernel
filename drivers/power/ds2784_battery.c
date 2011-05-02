@@ -1004,6 +1004,7 @@ static int ds2784_battery_probe(struct platform_device *pdev)
 	di = kzalloc(sizeof(*di), GFP_KERNEL);
 	if (!di)
 		return -ENOMEM;
+	the_di = di;
 
 	platform_set_drvdata(pdev, di);
 

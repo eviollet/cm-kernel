@@ -40,6 +40,7 @@
 #define AUDIO_SET_NS         _IOW(AUDIO_IOCTL_MAGIC, 13, unsigned)
 #define AUDIO_SET_TX_IIR     _IOW(AUDIO_IOCTL_MAGIC, 14, unsigned)
 #define AUDIO_PAUSE	     _IOW(AUDIO_IOCTL_MAGIC, 15, unsigned)
+/* TODO : Clean up useless defines? */
 #define AUDIO_SET_AAC_CONFIG        _IOW(AUDIO_IOCTL_MAGIC, 15, unsigned)
 #define AUDIO_WAIT_ADSP_DONE        _IOR(AUDIO_IOCTL_MAGIC, 16, unsigned)
 #define AUDIO_ADSP_PAUSE            _IOR(AUDIO_IOCTL_MAGIC, 17, unsigned)
@@ -55,8 +56,8 @@
 #define AUDIO_UPDATE_ACDB    _IOW(AUDIO_IOCTL_MAGIC, 34, unsigned)
 #define AUDIO_START_VOICE    _IOW(AUDIO_IOCTL_MAGIC, 35, unsigned)
 #define AUDIO_STOP_VOICE     _IOW(AUDIO_IOCTL_MAGIC, 36, unsigned)
-#define AUDIO_START_FM              _IOW(AUDIO_IOCTL_MAGIC, 37, unsigned)
-#define AUDIO_STOP_FM               _IOW(AUDIO_IOCTL_MAGIC, 38, unsigned)
+#define AUDIO_START_FM       _IOW(AUDIO_IOCTL_MAGIC, 37, unsigned)
+#define AUDIO_STOP_FM        _IOW(AUDIO_IOCTL_MAGIC, 38, unsigned)
 #define AUDIO_REINIT_ACDB    _IOW(AUDIO_IOCTL_MAGIC, 39, unsigned)
 #define AUDIO_ENABLE_AUXPGA_LOOPBACK _IOW(AUDIO_IOCTL_MAGIC, 40, unsigned)
 #define AUDIO_SET_AUXPGA_GAIN       _IOW(AUDIO_IOCTL_MAGIC, 41, unsigned)

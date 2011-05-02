@@ -26,6 +26,7 @@
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
 #include <linux/usb/android_composite.h>
+#include <linux/usb/f_accessory.h>
 #include <linux/android_pmem.h>
 #include <linux/synaptics_i2c_rmi.h>
 #include <linux/capella_cm3602_htc.h>
@@ -143,6 +144,11 @@ static char *usb_functions_rndis[] = {
 	"rndis",
 };
 
+#ifdef CONFIG_USB_ANDROID_ACCESSORY
+static char *usb_functions_accessory[] = { "accessory" };
+static char *usb_functions_accessory_adb[] = { "accessory", "adb" };
+#endif
+
 #ifdef CONFIG_USB_ANDROID_DIAG
 static char *usb_functions_adb_diag[] = {
 	"usb_mass_storage",
@@ -154,6 +160,9 @@ static char *usb_functions_adb_diag[] = {
 static char *usb_functions_all[] = {
 #ifdef CONFIG_USB_ANDROID_RNDIS
 	"rndis",
+#endif
+#ifdef CONFIG_USB_ANDROID_ACCESSORY
+	"accessory",
 #endif
 	"usb_mass_storage",
 	"adb",
@@ -181,6 +190,20 @@ static struct android_usb_product usb_products[] = {
 		.num_functions	= ARRAY_SIZE(usb_functions_rndis),
 		.functions	= usb_functions_rndis,
 	},
+#ifdef CONFIG_USB_ANDROID_ACCESSORY
+	{
+		.vendor_id	= USB_ACCESSORY_VENDOR_ID,
+		.product_id	= USB_ACCESSORY_PRODUCT_ID,
+		.num_functions	= ARRAY_SIZE(usb_functions_accessory),
+		.functions	= usb_functions_accessory,
+	},
+	{
+		.vendor_id	= USB_ACCESSORY_VENDOR_ID,
+		.product_id	= USB_ACCESSORY_ADB_PRODUCT_ID,
+		.num_functions	= ARRAY_SIZE(usb_functions_accessory_adb),
+		.functions	= usb_functions_accessory_adb,
+	},
+#endif
 #ifdef CONFIG_USB_ANDROID_DIAG
 	{
 		.product_id	= 0x0c07,
@@ -959,6 +982,58 @@ static struct platform_device bravo_oj = {
 };
 #endif
 
+static void
+msm_i2c_gpio_config(int iface, int config_type)
+{
+        int gpio_scl;
+        int gpio_sda;
+        if (iface) {
+                gpio_scl = 60;
+                gpio_sda = 61;
+        } else {
+                gpio_scl = 95;
+                gpio_sda = 96;
+        }
+        if (config_type) {
+                gpio_tlmm_config(GPIO_CFG(gpio_scl, 1, GPIO_CFG_INPUT,
+                                        GPIO_CFG_NO_PULL, GPIO_CFG_16MA), GPIO_CFG_ENABLE);
+                gpio_tlmm_config(GPIO_CFG(gpio_sda, 1, GPIO_CFG_INPUT,
+                                        GPIO_CFG_NO_PULL, GPIO_CFG_16MA), GPIO_CFG_ENABLE);
+        } else {
+                gpio_tlmm_config(GPIO_CFG(gpio_scl, 0, GPIO_CFG_OUTPUT,
+                                        GPIO_CFG_NO_PULL, GPIO_CFG_16MA), GPIO_CFG_ENABLE);
+                gpio_tlmm_config(GPIO_CFG(gpio_sda, 0, GPIO_CFG_OUTPUT,
+                                        GPIO_CFG_NO_PULL, GPIO_CFG_16MA), GPIO_CFG_ENABLE);
+        }
+}
+
+static struct msm_i2c_platform_data msm_i2c_pdata = {
+        .clk_freq = 100000,
+        .rsl_id = 6,
+        .pri_clk = 95,
+        .pri_dat = 96,
+        .aux_clk = 60,
+        .aux_dat = 61,
+        .msm_i2c_config_gpio = msm_i2c_gpio_config,
+};
+
+static void __init msm_device_i2c_init(void)
+{
+        if (gpio_request(95, "i2c_pri_clk"))
+                pr_err("failed to request gpio i2c_pri_clk\n");
+        if (gpio_request(96, "i2c_pri_dat"))
+                pr_err("failed to request gpio i2c_pri_dat\n");
+        if (gpio_request(60, "i2c_sec_clk"))
+                pr_err("failed to request gpio i2c_sec_clk\n");
+        if (gpio_request(61, "i2c_sec_dat"))
+                pr_err("failed to request gpio i2c_sec_dat\n");
+
+        msm_i2c_pdata.rmutex = 1;
+        msm_i2c_pdata.pm_lat = 4594;
+
+        msm_device_i2c.dev.platform_data = &msm_i2c_pdata;
+}
+
 static struct platform_device *devices[] __initdata = {
 #if !defined(CONFIG_MSM_SERIAL_DEBUGGER)
 	&msm_device_uart1,
@@ -1110,9 +1185,10 @@ static struct msm_acpu_clock_platform_data bravo_clock_data = {
 	.acpu_switch_time_us	= 20,
 	.max_speed_delta_khz	= 256000,
 	.vdd_switch_time_us	= 62,
-	.power_collapse_khz	= 245000,
-	.wait_for_irq_khz	= 245000,
-	.mpll_khz		= 245000
+/* TODO : Test 128000 */
+	.power_collapse_khz	= 245760,
+	.wait_for_irq_khz	= 245760,
+	.mpll_khz		= 245760
 };
 
 static struct msm_acpu_clock_platform_data bravo_cdma_clock_data = {
@@ -1206,7 +1282,9 @@ static void __init bravo_init(void)
 	msm_device_hsusb.dev.platform_data = &msm_hsusb_pdata;
 	msm_device_uart_dm1.dev.platform_data = &msm_uart_dm1_pdata;
 
+	msm_device_i2c_init();
 	platform_add_devices(devices, ARRAY_SIZE(devices));
+
 
 	i2c_register_board_info(0, base_i2c_devices,
 		ARRAY_SIZE(base_i2c_devices));

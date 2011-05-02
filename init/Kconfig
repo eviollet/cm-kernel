@@ -23,6 +23,19 @@ config CONSTRUCTORS
 
 menu "General setup"
 
+config SCHED_BFS
+	bool "BFS cpu scheduler"
+	---help---
+	  The Brain Fuck CPU Scheduler for excellent interactivity and
+	  responsiveness on the desktop and solid scalability on normal
+          hardware. Not recommended for 4096 CPUs.
+
+	  Currently incompatible with the Group CPU scheduler, and RCU TORTURE
+          TEST so these options are disabled.
+
+          Say Y here.
+	default y
+
 config EXPERIMENTAL
 	bool "Prompt for development and/or incomplete code/drivers"
 	---help---
@@ -334,15 +347,6 @@ choice
 	prompt "RCU Implementation"
 	default TREE_RCU
 
-config CLASSIC_RCU
-	bool "Classic RCU"
-	help
-	  This option selects the classic RCU implementation that is
-	  designed for best read-side performance on non-realtime
-	  systems.
-
-	  Select this option if you are unsure.
-
 config TREE_RCU
 	bool "Tree-based hierarchical RCU"
 	help
@@ -546,7 +550,7 @@ config PROC_PID_CPUSET
 
 config CGROUP_CPUACCT
 	bool "Simple CPU accounting cgroup subsystem"
-	depends on CGROUPS
+	depends on CGROUPS && !SCHED_BFS
 	help
 	  Provides a simple Resource Controller for monitoring the
 	  total CPU consumed by the tasks in a cgroup.
@@ -601,7 +605,7 @@ config CGROUP_MEM_RES_CTLR_SWAP
 
 menuconfig CGROUP_SCHED
 	bool "Group CPU scheduler"
-	depends on EXPERIMENTAL && CGROUPS
+	depends on EXPERIMENTAL && CGROUPS && !SCHED_BFS
 	default n
 	help
 	  This feature lets CPU scheduler recognize task groups and control CPU
@@ -1099,7 +1103,7 @@ config COMPAT_BRK
 
 choice
 	prompt "Choose SLAB allocator"
-	default SLQB
+	default SLUB
 	help
 	   This option allows to select a slab allocator.
 
@@ -1119,11 +1123,6 @@ config SLUB
 	   of queues of objects. SLUB can use memory efficiently
 	   and has enhanced diagnostics. SLUB is the default choice for
 	   a slab allocator.
-
-config SLQB
-	bool "SLQB (Queued allocator)"
-	help
-	  SLQB is a proposed new slab allocator.
 
 config SLOB
 	depends on EMBEDDED
@@ -1205,7 +1204,7 @@ config HAVE_GENERIC_DMA_COHERENT
 config SLABINFO
 	bool
 	depends on PROC_FS
-	depends on SLAB || SLUB_DEBUG || SLQB
+	depends on SLAB || SLUB_DEBUG
 	default y
 
 config RT_MUTEXES
