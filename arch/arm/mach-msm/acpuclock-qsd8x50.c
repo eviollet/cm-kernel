@@ -78,23 +78,23 @@ struct clkctl_acpu_speed {
 #define SRC_PLL1	3 /* 768 MHz */
 
 struct clkctl_acpu_speed acpu_freq_tbl[] = {
-        {  19200, CCTL(CLK_TCXO, 1),            SRC_RAW, 0, 0, 975, 14000 },
-//	{  76800, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x02, 0, 900, 58000 },
-        { 128000, CCTL(CLK_TCXO, 1),            SRC_AXI, 0, 0, 975, 14000 },
-//	{ 192000, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x05, 0, 1000, 58000 },
-        { 245760, CCTL(CLK_MODEM_PLL, 1),       SRC_RAW, 0, 0, 1000, 29000 },
+        {  19200, CCTL(CLK_TCXO, 1),            SRC_RAW, 0, 0, 1050, 14000 },
+	{  76800, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x02, 0, 1050, 58000 },
+        { 128000, CCTL(CLK_TCXO, 1),            SRC_AXI, 0, 0, 1050, 14000 },
+//	{ 192000, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x05, 0, 1050, 58000 },
+        { 245760, CCTL(CLK_MODEM_PLL, 1),       SRC_RAW, 0, 0, 1050, 29000 },
         /* Work arround for acpu resume hung, GPLL is turn off by arm9 */
-        /*{ 256000, CCTL(CLK_GLOBAL_PLL, 3),      SRC_RAW, 0, 0, 1000, 29000 },*/
-        { 384000, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0A, 0, 1025, 58000 },
+        /*{ 256000, CCTL(CLK_GLOBAL_PLL, 3),      SRC_RAW, 0, 0, 1050, 29000 },*/
+        { 384000, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0A, 0, 1050, 58000 },
         { 422400, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0B, 0, 1050, 117000 },
         { 460800, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0C, 0, 1050, 117000 },
         { 499200, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0D, 0, 1075, 117000 },
-        { 537600, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0E, 0, 1075, 117000 },
+        { 537600, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0E, 0, 1100, 117000 },
         { 576000, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x0F, 0, 1100, 117000 },
-        { 614400, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x10, 0, 1100, 117000 },
-        { 652800, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x11, 0, 1125, 117000 },
-        { 691200, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x12, 0, 1150, 117000 },
-        { 729600, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x13, 0, 1175, 117000 },
+        { 614400, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x10, 0, 1125, 117000 },
+        { 652800, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x11, 0, 1150, 117000 },
+        { 691200, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x12, 0, 1175, 117000 },
+        { 729600, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x13, 0, 1200, 117000 },
         { 768000, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x14, 0, 1200, 128000 },
         { 806400, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x15, 0, 1225, 128000 },
         { 844800, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x16, 0, 1250, 128000 },
@@ -136,6 +136,7 @@ static void __init acpuclk_init_cpufreq_table(void)
 		/* Define speeds that we want to skip */
 		if (/* acpu_freq_tbl[i].acpu_khz == 256000 || */
 				acpu_freq_tbl[i].acpu_khz == 19200 ||
+				acpu_freq_tbl[i].acpu_khz == 76800 ||
 				//acpu_freq_tbl[i].acpu_khz == 128000 ||
 				//acpu_freq_tbl[i].acpu_khz == 245000 ||
 				acpu_freq_tbl[i].acpu_khz == 256000)
