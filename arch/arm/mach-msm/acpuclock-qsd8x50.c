@@ -79,7 +79,7 @@ struct clkctl_acpu_speed {
 
 struct clkctl_acpu_speed acpu_freq_tbl[] = {
         {  19200, CCTL(CLK_TCXO, 1),            SRC_RAW, 0, 0, 975, 14000 },
-//	{  76800, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x02, 0, 900, 58000 },
+	{  76800, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x02, 0, 900, 58000 },
         { 128000, CCTL(CLK_TCXO, 1),            SRC_AXI, 0, 0, 975, 14000 },
 //	{ 192000, CCTL(CLK_TCXO, 1),            SRC_SCPLL, 0x05, 0, 1000, 58000 },
         { 245760, CCTL(CLK_MODEM_PLL, 1),       SRC_RAW, 0, 0, 1000, 29000 },
@@ -136,6 +136,7 @@ static void __init acpuclk_init_cpufreq_table(void)
 		/* Define speeds that we want to skip */
 		if (/* acpu_freq_tbl[i].acpu_khz == 256000 || */
 				acpu_freq_tbl[i].acpu_khz == 19200 ||
+				acpu_freq_tbl[i].acpu_khz == 76800 ||
 				//acpu_freq_tbl[i].acpu_khz == 128000 ||
 				//acpu_freq_tbl[i].acpu_khz == 245000 ||
 				acpu_freq_tbl[i].acpu_khz == 256000)
