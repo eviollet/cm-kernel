@@ -86,3 +86,4 @@ arch/arm/boot/compressed/vmlinux
 #
 kernel.zip
 kernel-signed.zip
+flash/kernel/zImage
