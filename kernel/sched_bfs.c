@@ -85,7 +85,7 @@
 #define idleprio_task(p)	unlikely((p)->policy == SCHED_IDLEPRIO)
 #define iso_task(p)		unlikely((p)->policy == SCHED_ISO)
 #define iso_queue(rq)		unlikely((rq)->rq_policy == SCHED_ISO)
-#define ISO_PERIOD		((5 * HZ * num_online_cpus()) + 1)
+#define ISO_PERIOD		((5 * HZ * grq.noc) + 1)
 
 /*
  * Convert user-nice values [ -20 ... 0 ... 19 ]
@@ -120,14 +120,14 @@
 #define NS_TO_MS(TIME)		((TIME) >> 20)
 #define NS_TO_US(TIME)		((TIME) >> 10)
 
-#define RESCHED_US	(100) /* Reschedule if less than this many us left */
+#define RESCHED_US	(100) /* Reschedule if less than this many μs left */
 
 /*
  * This is the time all tasks within the same priority round robin.
  * Value is in ms and set to a minimum of 6ms. Scales with number of cpus.
  * Tunable via /proc interface.
  */
-int rr_interval __read_mostly = 6;
+int rr_interval __read_mostly = 24;
 
 /*
  * sched_iso_cpu - sysctl which determines the cpu percentage SCHED_ISO tasks
@@ -135,15 +135,6 @@ int rr_interval __read_mostly = 6;
  * all online cpus.
  */
 int sched_iso_cpu __read_mostly = 70;
-
-/*
- * group_thread_accounting - sysctl to decide whether to treat whole thread
- * groups as a single entity for the purposes of CPU distribution.
- */
-int group_thread_accounting __read_mostly;
-
-/* fork_depth_penalty - Whether to penalise CPU according to fork depth. */
-int fork_depth_penalty __read_mostly = 1;
 
 /*
  * The relative length of deadline for each priority(nice) level.
@@ -154,7 +145,7 @@ static int prio_ratios[PRIO_RANGE] __read_mostly;
  * The quota handed out to tasks of all priority levels when refilling their
  * time_slice.
  */
-static inline unsigned long timeslice(void)
+static inline int timeslice(void)
 {
 	return MS_TO_US(rr_interval);
 }
@@ -176,6 +167,7 @@ struct global_rq {
 	cpumask_t cpu_idle_map;
 	int idle_cpus;
 #endif
+	int noc; /* num_online_cpus stored and updated when it changes */
 	u64 niffies; /* Nanosecond jiffies */
 	unsigned long last_jiffy; /* Last jiffy we updated niffies */
 
@@ -197,7 +189,6 @@ struct rq {
 	u64 nohz_stamp;
 	unsigned char in_nohz_recently;
 #endif
-	struct task_struct *last_task;
 #endif
 
 	struct task_struct *curr, *idle;
@@ -220,6 +211,8 @@ struct rq {
 #ifdef CONFIG_SMP
 	int cpu;		/* cpu of this runqueue */
 	int online;
+	int scaling; /* This CPU is managed by a scaling CPU freq governor */
+	struct task_struct *sticky_task;
 
 	struct root_domain *rd;
 	struct sched_domain *sd;
@@ -236,7 +229,11 @@ struct rq {
 #endif
 	u64 last_niffy; /* Last time this RQ updated grq.niffies */
 #endif
+#ifdef CONFIG_IRQ_TIME_ACCOUNTING
+	u64 prev_irq_time;
+#endif
 	u64 clock, old_clock, last_tick;
+	u64 clock_task;
 	int dither;
 
 #ifdef CONFIG_SCHEDSTATS
@@ -418,9 +415,14 @@ static inline void update_clocks(struct rq *rq)
  * when we're not updating niffies.
  * Looking up task_rq must be done under grq.lock to be safe.
  */
+static void update_rq_clock_task(struct rq *rq, s64 delta);
+
 static inline void update_rq_clock(struct rq *rq)
 {
-	rq->clock = sched_clock_cpu(cpu_of(rq));
+	s64 delta = sched_clock_cpu(cpu_of(rq)) - rq->clock;
+
+	rq->clock += delta;
+	update_rq_clock_task(rq, delta);
 }
 
 static inline int task_running(struct task_struct *p)
@@ -644,29 +646,11 @@ static int isoprio_suitable(void)
 	return !grq.iso_refractory;
 }
 
-static inline u64 __task_deadline_diff(struct task_struct *p);
-static inline u64 task_deadline_diff(struct task_struct *p);
-
 /*
  * Adding to the global runqueue. Enter with grq locked.
  */
 static void enqueue_task(struct task_struct *p)
 {
-	s64 max_tdd = task_deadline_diff(p);
-
-	/*
-	 * Make sure that when we're queueing this task again that it
-	 * doesn't have any old deadlines from when the thread group was
-	 * being penalised and cap the deadline to the highest it could
-	 * be, based on the current number of threads running.
-	 */
-	if (group_thread_accounting) {
-		max_tdd += p->group_leader->threads_running *
-			   __task_deadline_diff(p);
-	}
-	if (p->deadline - p->deadline_niffy > max_tdd)
-		p->deadline = p->deadline_niffy + max_tdd;
-
 	if (!rt_task(p)) {
 		/* Check it hasn't gotten rt from PI */
 		if ((idleprio_task(p) && idleprio_suitable(p)) ||
@@ -761,26 +745,17 @@ static int suitable_idle_cpus(struct task_struct *p)
 
 static void resched_task(struct task_struct *p);
 
-/*
- * last_task stores the last non-idle task scheduled on the local rq for
- * cache warmth testing.
- */
-static inline void set_last_task(struct rq *rq, struct task_struct *p)
-{
-	rq->last_task = p;
-}
-
-#define CPUIDLE_CACHE_BUSY	(1)
-#define CPUIDLE_DIFF_CPU	(2)
-#define CPUIDLE_THREAD_BUSY	(4)
-#define CPUIDLE_DIFF_NODE	(8)
+#define CPUIDLE_DIFF_THREAD	(1)
+#define CPUIDLE_DIFF_CORE	(2)
+#define CPUIDLE_CACHE_BUSY	(4)
+#define CPUIDLE_DIFF_CPU	(8)
+#define CPUIDLE_THREAD_BUSY	(16)
+#define CPUIDLE_DIFF_NODE	(32)
 
 /*
  * The best idle CPU is chosen according to the CPUIDLE ranking above where the
- * lowest value would give the most suitable CPU to schedule p onto next. We
- * iterate from the last CPU upwards instead of using for_each_cpu_mask so as
- * to be able to break out immediately if the last CPU is idle. The order works
- * out to be the following:
+ * lowest value would give the most suitable CPU to schedule p onto next. The
+ * order works out to be the following:
  *
  * Same core, idle or busy cache, idle threads
  * Other core, same cache, idle or busy cache, idle threads.
@@ -792,67 +767,57 @@ static inline void set_last_task(struct rq *rq, struct task_struct *p)
  * Other node, other CPU, idle cache, idle threads.
  * Other node, other CPU, busy cache, idle threads.
  * Other node, other CPU, busy threads.
- *
- * If p was the last task running on this rq, then regardless of where
- * it has been running since then, it is cache warm on this rq.
  */
-static void resched_best_idle(struct task_struct *p)
+static void
+resched_best_mask(unsigned long best_cpu, struct rq *rq, cpumask_t *tmpmask)
 {
-	unsigned long cpu_tmp, best_cpu, best_ranking;
-	cpumask_t tmpmask;
-	struct rq *rq;
-	int iterate;
+	unsigned long cpu_tmp, best_ranking;
 
-	cpus_and(tmpmask, p->cpus_allowed, grq.cpu_idle_map);
-	iterate = cpus_weight(tmpmask);
-	best_cpu = task_cpu(p);
-	/*
-	 * Start below the last CPU and work up with next_cpu as the last
-	 * CPU might not be idle or affinity might not allow it.
-	 */
-	cpu_tmp = best_cpu - 1;
-	rq = cpu_rq(best_cpu);
 	best_ranking = ~0UL;
 
-	do {
+	for_each_cpu_mask(cpu_tmp, *tmpmask) {
 		unsigned long ranking;
 		struct rq *tmp_rq;
 
 		ranking = 0;
-		cpu_tmp = next_cpu(cpu_tmp, tmpmask);
-		if (cpu_tmp >= nr_cpu_ids) {
-			cpu_tmp = -1;
-			cpu_tmp = next_cpu(cpu_tmp, tmpmask);
-		}
 		tmp_rq = cpu_rq(cpu_tmp);
 
-		if (rq->cpu_locality[cpu_tmp]) {
-			/* Check rq->last_task hasn't been dereferenced */
-			if (rq->last_task && p != rq->last_task) {
 #ifdef CONFIG_NUMA
-				if (rq->cpu_locality[cpu_tmp] > 1)
-					ranking |= CPUIDLE_DIFF_NODE;
+		if (rq->cpu_locality[cpu_tmp] > 3)
+			ranking |= CPUIDLE_DIFF_NODE;
+		else
 #endif
-				ranking |= CPUIDLE_DIFF_CPU;
-			}
-		}
+		if (rq->cpu_locality[cpu_tmp] > 2)
+			ranking |= CPUIDLE_DIFF_CPU;
 #ifdef CONFIG_SCHED_MC
+		if (rq->cpu_locality[cpu_tmp] == 2)
+			ranking |= CPUIDLE_DIFF_CORE;
 		if (!(tmp_rq->cache_idle(cpu_tmp)))
 			ranking |= CPUIDLE_CACHE_BUSY;
 #endif
 #ifdef CONFIG_SCHED_SMT
+		if (rq->cpu_locality[cpu_tmp] == 1)
+			ranking |= CPUIDLE_DIFF_THREAD;
 		if (!(tmp_rq->siblings_idle(cpu_tmp)))
 			ranking |= CPUIDLE_THREAD_BUSY;
 #endif
 		if (ranking < best_ranking) {
 			best_cpu = cpu_tmp;
-			if (ranking <= 1)
+			if (ranking == 0)
 				break;
 			best_ranking = ranking;
 		}
-	} while (--iterate > 0);
+	}
 
 	resched_task(cpu_rq(best_cpu)->curr);
+}
+
+static void resched_best_idle(struct task_struct *p)
+{
+	cpumask_t tmpmask;
+
+	cpus_and(tmpmask, p->cpus_allowed, grq.cpu_idle_map);
+	resched_best_mask(task_cpu(p), task_rq(p), &tmpmask);
 }
 
 static inline void resched_suitable_idle(struct task_struct *p)
@@ -860,28 +825,24 @@ static inline void resched_suitable_idle(struct task_struct *p)
 	if (suitable_idle_cpus(p))
 		resched_best_idle(p);
 }
-
 /*
- * The cpu cache locality difference between CPUs is used to determine how far
- * to offset the virtual deadline. "One" difference in locality means that one
- * timeslice difference is allowed longer for the cpu local tasks. This is
- * enough in the common case when tasks are up to 2* number of CPUs to keep
- * tasks within their shared cache CPUs only. CPUs on different nodes or not
- * even in this domain (NUMA) have "3" difference, allowing 4 times longer
- * deadlines before being taken onto another cpu, allowing for 2* the double
- * seen by separate CPUs above.
- * Simple summary: Virtual deadlines are equal on shared cache CPUs, double
- * on separate CPUs and quadruple in separate NUMA nodes.
+ * Flags to tell us whether this CPU is running a CPU frequency governor that
+ * has slowed its speed or not. No locking required as the very rare wrongly
+ * read value would be harmless.
  */
-static inline int
-cache_distance(struct rq *task_rq, struct rq *rq, struct task_struct *p)
+void cpu_scaling(int cpu)
 {
-	/* Check rq->last_task hasn't been dereferenced */
-	if (likely(rq->last_task)) {
-		if (rq->last_task == p)
-			return 0;
-	}
-	return rq->cpu_locality[cpu_of(task_rq)] * task_timeslice(p);
+	cpu_rq(cpu)->scaling = 1;
+}
+
+void cpu_nonscaling(int cpu)
+{
+	cpu_rq(cpu)->scaling = 0;
+}
+
+static inline int scaling_rq(struct rq *rq)
+{
+	return rq->scaling;
 }
 #else /* CONFIG_SMP */
 static inline void inc_qnr(void)
@@ -914,16 +875,25 @@ static inline void resched_suitable_idle(struct task_struct *p)
 {
 }
 
-static inline int
-cache_distance(struct rq *task_rq, struct rq *rq, struct task_struct *p)
+void cpu_scaling(int __unused)
+{
+}
+
+void cpu_nonscaling(int __unused)
+{
+}
+
+/*
+ * Although CPUs can scale in UP, there is nowhere else for tasks to go so this
+ * always returns 0.
+ */
+static inline int scaling_rq(struct rq *rq)
 {
 	return 0;
 }
-
-static inline void set_last_task(struct rq *rq, struct task_struct *p)
-{
-}
 #endif /* CONFIG_SMP */
+EXPORT_SYMBOL_GPL(cpu_scaling);
+EXPORT_SYMBOL_GPL(cpu_nonscaling);
 
 /*
  * activate_idle_task - move idle task to the _front_ of runqueue.
@@ -966,13 +936,10 @@ static int effective_prio(struct task_struct *p)
 }
 
 /*
- * activate_task - move a task to the runqueue. Enter with grq locked. The
- * number of threads running is stored in the group_leader struct.
+ * activate_task - move a task to the runqueue. Enter with grq locked.
  */
 static void activate_task(struct task_struct *p, struct rq *rq)
 {
-	unsigned long *threads_running = &p->group_leader->threads_running;
-
 	update_clocks(rq);
 
 	/*
@@ -989,14 +956,6 @@ static void activate_task(struct task_struct *p, struct rq *rq)
 	p->prio = effective_prio(p);
 	if (task_contributes_to_load(p))
 		grq.nr_uninterruptible--;
-	/*
-	 * Adjust deadline according to number of running threads within
-	 * this thread group. This ends up distributing CPU to the thread
-	 * group as a single entity.
-	 */
-	++*threads_running;
-	if (*threads_running > 1 && group_thread_accounting)
-		p->deadline += __task_deadline_diff(p);
 	enqueue_task(p);
 	grq.nr_running++;
 	inc_qnr();
@@ -1008,14 +967,9 @@ static void activate_task(struct task_struct *p, struct rq *rq)
  */
 static inline void deactivate_task(struct task_struct *p)
 {
-	unsigned long *threads_running = &p->group_leader->threads_running;
-
 	if (task_contributes_to_load(p))
 		grq.nr_uninterruptible++;
 	grq.nr_running--;
-	--*threads_running;
-	if (*threads_running > 0 && group_thread_accounting)
-		p->deadline -= __task_deadline_diff(p);
 }
 
 #ifdef CONFIG_SMP
@@ -1033,6 +987,82 @@ void set_task_cpu(struct task_struct *p, unsigned int cpu)
 	smp_wmb();
 	task_thread_info(p)->cpu = cpu;
 }
+
+static inline void clear_sticky(struct task_struct *p)
+{
+	p->sticky = 0;
+}
+
+static inline int task_sticky(struct task_struct *p)
+{
+	return p->sticky;
+}
+
+/* Reschedule the best idle CPU that is not this one. */
+static void
+resched_closest_idle(struct rq *rq, unsigned long cpu, struct task_struct *p)
+{
+	cpumask_t tmpmask;
+
+	cpus_and(tmpmask, p->cpus_allowed, grq.cpu_idle_map);
+	cpu_clear(cpu, tmpmask);
+	if (cpus_empty(tmpmask))
+		return;
+	resched_best_mask(cpu, rq, &tmpmask);
+}
+
+/*
+ * We set the sticky flag on a task that is descheduled involuntarily meaning
+ * it is awaiting further CPU time. If the last sticky task is still sticky
+ * but unlucky enough to not be the next task scheduled, we unstick it and try
+ * to find it an idle CPU. Realtime tasks do not stick to minimise their
+ * latency at all times.
+ */
+static inline void
+swap_sticky(struct rq *rq, unsigned long cpu, struct task_struct *p)
+{
+	if (rq->sticky_task) {
+		if (rq->sticky_task == p) {
+			p->sticky = 1;
+			return;
+		}
+		if (rq->sticky_task->sticky) {
+			rq->sticky_task->sticky = 0;
+			resched_closest_idle(rq, cpu, rq->sticky_task);
+		}
+	}
+	if (!rt_task(p)) {
+		p->sticky = 1;
+		rq->sticky_task = p;
+	} else {
+		resched_closest_idle(rq, cpu, p);
+		rq->sticky_task = NULL;
+	}
+}
+
+static inline void unstick_task(struct rq *rq, struct task_struct *p)
+{
+	rq->sticky_task = NULL;
+	clear_sticky(p);
+}
+#else
+static inline void clear_sticky(struct task_struct *p)
+{
+}
+
+static inline int task_sticky(struct task_struct *p)
+{
+	return 0;
+}
+
+static inline void
+swap_sticky(struct rq *rq, unsigned long cpu, struct task_struct *p)
+{
+}
+
+static inline void unstick_task(struct rq *rq, struct task_struct *p)
+{
+}
 #endif
 
 /*
@@ -1043,6 +1073,7 @@ static inline void take_task(struct rq *rq, struct task_struct *p)
 {
 	set_task_cpu(p, cpu_of(rq));
 	dequeue_task(p);
+	clear_sticky(p);
 	dec_qnr();
 }
 
@@ -1302,7 +1333,7 @@ static inline int online_cpus(struct task_struct *p)
  */
 static inline int needs_other_cpu(struct task_struct *p, int cpu)
 {
-	if (unlikely(!cpu_isset(cpu, p->cpus_allowed) && online_cpus(p)))
+	if (unlikely(!cpu_isset(cpu, p->cpus_allowed)))
 		return 1;
 	return 0;
 }
@@ -1319,25 +1350,31 @@ static void try_preempt(struct task_struct *p, struct rq *this_rq)
 	int highest_prio;
 	cpumask_t tmp;
 
-	/* IDLEPRIO tasks never preempt anything */
-	if (p->policy == SCHED_IDLEPRIO)
-		return;
+	/*
+	 * We clear the sticky flag here because for a task to have called
+	 * try_preempt with the sticky flag enabled means some complicated
+	 * re-scheduling has occurred and we should ignore the sticky flag.
+	 */
+	clear_sticky(p);
 
 	if (suitable_idle_cpus(p)) {
 		resched_best_idle(p);
 		return;
 	}
 
-	if (online_cpus(p))
+	/* IDLEPRIO tasks never preempt anything */
+	if (p->policy == SCHED_IDLEPRIO)
+		return;
+
+	if (likely(online_cpus(p)))
 		cpus_and(tmp, cpu_online_map, p->cpus_allowed);
 	else
-		(cpumask_copy(&tmp, &cpu_online_map));
+		return;
 
 	latest_deadline = 0;
 	highest_prio = -1;
 
 	for_each_cpu_mask(cpu, tmp) {
-		u64 offset_deadline;
 		struct rq *rq;
 		int rq_prio;
 
@@ -1346,12 +1383,9 @@ static void try_preempt(struct task_struct *p, struct rq *this_rq)
 		if (rq_prio < highest_prio)
 			continue;
 
-		offset_deadline = rq->rq_deadline -
-				  cache_distance(this_rq, rq, p);
-
-		if (rq_prio > highest_prio || (rq_prio == highest_prio &&
-		    deadline_after(offset_deadline, latest_deadline))) {
-			latest_deadline = offset_deadline;
+		if (rq_prio > highest_prio ||
+		    deadline_after(rq->rq_deadline, latest_deadline)) {
+			latest_deadline = rq->rq_deadline;
 			highest_prio = rq_prio;
 			highest_prio_rq = rq;
 		}
@@ -1544,6 +1578,7 @@ void sched_fork(struct task_struct *p, int clone_flags)
 #endif
 
 	p->oncpu = 0;
+	clear_sticky(p);
 
 #ifdef CONFIG_PREEMPT
 	/* Want to start with kernel preemption disabled. */
@@ -1599,10 +1634,6 @@ void wake_up_new_task(struct task_struct *p, unsigned long clone_flags)
 	parent = p->parent;
 	/* Unnecessary but small chance that the parent changed CPU */
 	set_task_cpu(p, task_cpu(parent));
-	if (!(clone_flags & CLONE_THREAD)) {
-		p->fork_depth++;
-		p->threads_running = 0;
-	}
 	activate_task(p, rq);
 	trace_sched_wakeup_new(p, 1);
 	if (!(clone_flags & CLONE_VM) && rq->curr == parent &&
@@ -1799,14 +1830,14 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	 */
 	arch_start_context_switch(prev);
 
-	if (likely(!mm)) {
+	if (!mm) {
 		next->active_mm = oldmm;
 		atomic_inc(&oldmm->mm_count);
 		enter_lazy_tlb(oldmm, next);
 	} else
 		switch_mm(oldmm, mm, next);
 
-	if (likely(!prev->mm)) {
+	if (!prev->mm) {
 		prev->active_mm = NULL;
 		rq->prev_mm = oldmm;
 	}
@@ -1894,8 +1925,7 @@ unsigned long nr_active(void)
 unsigned long this_cpu_load(void)
 {
 	return this_rq()->rq_running +
-		(queued_notrunning() + nr_uninterruptible()) /
-		(1 + num_online_cpus());
+		((queued_notrunning() + nr_uninterruptible()) / grq.noc);
 }
 
 /* Variables and functions for calc_load */
@@ -1929,7 +1959,7 @@ calc_load(unsigned long load, unsigned long exp, unsigned long active)
 /*
  * calc_load - update the avenrun load estimates every LOAD_FREQ seconds.
  */
-void calc_global_load(void)
+void calc_global_load(unsigned long ticks)
 {
 	long active;
 
@@ -1947,6 +1977,152 @@ void calc_global_load(void)
 DEFINE_PER_CPU(struct kernel_stat, kstat);
 
 EXPORT_PER_CPU_SYMBOL(kstat);
+
+#ifdef CONFIG_IRQ_TIME_ACCOUNTING
+
+/*
+ * There are no locks covering percpu hardirq/softirq time.
+ * They are only modified in account_system_vtime, on corresponding CPU
+ * with interrupts disabled. So, writes are safe.
+ * They are read and saved off onto struct rq in update_rq_clock().
+ * This may result in other CPU reading this CPU's irq time and can
+ * race with irq/account_system_vtime on this CPU. We would either get old
+ * or new value with a side effect of accounting a slice of irq time to wrong
+ * task when irq is in progress while we read rq->clock. That is a worthy
+ * compromise in place of having locks on each irq in account_system_time.
+ */
+static DEFINE_PER_CPU(u64, cpu_hardirq_time);
+static DEFINE_PER_CPU(u64, cpu_softirq_time);
+
+static DEFINE_PER_CPU(u64, irq_start_time);
+static int sched_clock_irqtime;
+
+void enable_sched_clock_irqtime(void)
+{
+	sched_clock_irqtime = 1;
+}
+
+void disable_sched_clock_irqtime(void)
+{
+	sched_clock_irqtime = 0;
+}
+
+#ifndef CONFIG_64BIT
+static DEFINE_PER_CPU(seqcount_t, irq_time_seq);
+
+static inline void irq_time_write_begin(void)
+{
+	__this_cpu_inc(irq_time_seq.sequence);
+	smp_wmb();
+}
+
+static inline void irq_time_write_end(void)
+{
+	smp_wmb();
+	__this_cpu_inc(irq_time_seq.sequence);
+}
+
+static inline u64 irq_time_read(int cpu)
+{
+	u64 irq_time;
+	unsigned seq;
+
+	do {
+		seq = read_seqcount_begin(&per_cpu(irq_time_seq, cpu));
+		irq_time = per_cpu(cpu_softirq_time, cpu) +
+			   per_cpu(cpu_hardirq_time, cpu);
+	} while (read_seqcount_retry(&per_cpu(irq_time_seq, cpu), seq));
+
+	return irq_time;
+}
+#else /* CONFIG_64BIT */
+static inline void irq_time_write_begin(void)
+{
+}
+
+static inline void irq_time_write_end(void)
+{
+}
+
+static inline u64 irq_time_read(int cpu)
+{
+	return per_cpu(cpu_softirq_time, cpu) + per_cpu(cpu_hardirq_time, cpu);
+}
+#endif /* CONFIG_64BIT */
+
+/*
+ * Called before incrementing preempt_count on {soft,}irq_enter
+ * and before decrementing preempt_count on {soft,}irq_exit.
+ */
+void account_system_vtime(struct task_struct *curr)
+{
+	unsigned long flags;
+	s64 delta;
+	int cpu;
+
+	if (!sched_clock_irqtime)
+		return;
+
+	local_irq_save(flags);
+
+	cpu = smp_processor_id();
+	delta = sched_clock_cpu(cpu) - __this_cpu_read(irq_start_time);
+	__this_cpu_add(irq_start_time, delta);
+
+	irq_time_write_begin();
+	/*
+	 * We do not account for softirq time from ksoftirqd here.
+	 * We want to continue accounting softirq time to ksoftirqd thread
+	 * in that case, so as not to confuse scheduler with a special task
+	 * that do not consume any time, but still wants to run.
+	 */
+	if (hardirq_count())
+		__this_cpu_add(cpu_hardirq_time, delta);
+	else if (in_serving_softirq() && !(curr->flags & PF_KSOFTIRQD))
+		__this_cpu_add(cpu_softirq_time, delta);
+
+	irq_time_write_end();
+	local_irq_restore(flags);
+}
+EXPORT_SYMBOL_GPL(account_system_vtime);
+
+static void update_rq_clock_task(struct rq *rq, s64 delta)
+{
+	s64 irq_delta;
+
+	irq_delta = irq_time_read(cpu_of(rq)) - rq->prev_irq_time;
+
+	/*
+	 * Since irq_time is only updated on {soft,}irq_exit, we might run into
+	 * this case when a previous update_rq_clock() happened inside a
+	 * {soft,}irq region.
+	 *
+	 * When this happens, we stop ->clock_task and only update the
+	 * prev_irq_time stamp to account for the part that fit, so that a next
+	 * update will consume the rest. This ensures ->clock_task is
+	 * monotonic.
+	 *
+	 * It does however cause some slight miss-attribution of {soft,}irq
+	 * time, a more accurate solution would be to update the irq_time using
+	 * the current rq->clock timestamp, except that would require using
+	 * atomic ops.
+	 */
+	if (irq_delta > delta)
+		irq_delta = delta;
+
+	rq->prev_irq_time += irq_delta;
+	delta -= irq_delta;
+	rq->clock_task += delta;
+}
+
+#else /* CONFIG_IRQ_TIME_ACCOUNTING */
+
+static void update_rq_clock_task(struct rq *rq, s64 delta)
+{
+	rq->clock_task += delta;
+}
+
+#endif /* CONFIG_IRQ_TIME_ACCOUNTING */
 
 /*
  * On each tick, see what percentage of that tick was attributed to each
@@ -1992,9 +2168,13 @@ pc_system_time(struct rq *rq, struct task_struct *p, int hardirq_offset,
 	}
 	p->sched_time += ns;
 
-	if (hardirq_count() - hardirq_offset)
+	if (hardirq_count() - hardirq_offset) {
 		rq->irq_pc += pc;
-	else if (softirq_count()) {
+		if (rq->irq_pc >= 100) {
+			rq->irq_pc %= 100;
+			cpustat->irq = cputime64_add(cpustat->irq, tmp);
+		}
+	} else if (softirq_count()) {
 		rq->softirq_pc += pc;
 		if (rq->softirq_pc >= 100) {
 			rq->softirq_pc %= 100;
@@ -2384,7 +2564,7 @@ static void task_running_tick(struct rq *rq)
 	 * Tasks that were scheduled in the first half of a tick are not
 	 * allowed to run into the 2nd half of the next tick if they will
 	 * run out of time slice in the interim. Otherwise, if they have
-	 * less than 100us of time slice left they will be rescheduled.
+	 * less than RESCHED_US μs of time slice left they will be rescheduled.
 	 */
 	if (rq->dither) {
 		if (rq->rq_time_slice > HALF_JIFFY_US)
@@ -2497,18 +2677,9 @@ static inline u64 prio_deadline_diff(int user_prio)
 	return (prio_ratios[user_prio] * rr_interval * (MS_TO_NS(1) / 128));
 }
 
-static inline u64 __task_deadline_diff(struct task_struct *p)
-{
-	return prio_deadline_diff(TASK_USER_PRIO(p));
-}
-
 static inline u64 task_deadline_diff(struct task_struct *p)
 {
-	u64 pdd = __task_deadline_diff(p);
-
-	if (fork_depth_penalty && p->fork_depth > 1)
-		pdd *= p->fork_depth;
-	return pdd;
+	return prio_deadline_diff(TASK_USER_PRIO(p));
 }
 
 static inline u64 static_deadline_diff(int static_prio)
@@ -2516,9 +2687,14 @@ static inline u64 static_deadline_diff(int static_prio)
 	return prio_deadline_diff(USER_PRIO(static_prio));
 }
 
+static inline int longest_deadline_diff(void)
+{
+	return prio_deadline_diff(39);
+}
+
 static inline int ms_longest_deadline_diff(void)
 {
-	return NS_TO_MS(prio_deadline_diff(39));
+	return NS_TO_MS(longest_deadline_diff());
 }
 
 /*
@@ -2527,24 +2703,8 @@ static inline int ms_longest_deadline_diff(void)
  */
 static void time_slice_expired(struct task_struct *p)
 {
-	u64 tdd = task_deadline_diff(p);
-
-	/*
-	 * We proportionately increase the deadline according to how many
-	 * threads are running. This effectively makes a thread group have
-	 * the same CPU as one task, no matter how many threads are running.
-	 * time_slice_expired can be called when there may be none running
-	 * when p is deactivated so we must explicitly test for more than 1.
-	 */
-	if (group_thread_accounting) {
-		unsigned long *threads_running = &p->group_leader->threads_running;
-
-		if (*threads_running > 1)
-			tdd += *threads_running * __task_deadline_diff(p);
-	}
 	p->time_slice = timeslice();
-	p->deadline_niffy = grq.niffies;
-	p->deadline = grq.niffies + tdd;
+	p->deadline = grq.niffies + task_deadline_diff(p);
 }
 
 /*
@@ -2604,7 +2764,19 @@ retry:
 			goto out_take;
 		}
 
-		dl = p->deadline + cache_distance(task_rq(p), rq, p);
+		/*
+		 * Soft affinity happens here by not scheduling a task with
+		 * its sticky flag set that ran on a different CPU last when
+		 * the CPU is scaling, or by greatly biasing against its
+		 * deadline when not.
+		 */
+		if (task_rq(p) != rq && task_sticky(p)) {
+			if (scaling_rq(rq))
+				continue;
+			else
+				dl = p->deadline + longest_deadline_diff();
+		} else
+			dl = p->deadline;
 
 		/*
 		 * No rt tasks. Find the earliest deadline task. Now we're in
@@ -2682,7 +2854,7 @@ static inline void set_rq_task(struct rq *rq, struct task_struct *p)
 {
 	rq->rq_time_slice = p->time_slice;
 	rq->rq_deadline = p->deadline;
-	rq->rq_last_ran = p->last_ran;
+	rq->rq_last_ran = p->last_ran = rq->clock;
 	rq->rq_policy = p->policy;
 	rq->rq_prio = p->prio;
 	if (p != rq->idle)
@@ -2761,14 +2933,8 @@ need_resched_nonpreemptible:
 				*/
 				grq_unlock_irq();
 				goto rerun_prev_unlocked;
-			} else {
-				/*
-				 * If prev got kicked off by a task that has to
-				 * run on this CPU for affinity reasons then
-				 * there may be an idle CPU it can go to.
-				 */
-				resched_suitable_idle(prev);
-			}
+			} else
+				swap_sticky(rq, cpu, prev);
 		}
 		return_task(prev, deactivate);
 	}
@@ -2783,17 +2949,24 @@ need_resched_nonpreemptible:
 		set_cpuidle_map(cpu);
 	} else {
 		next = earliest_deadline_task(rq, idle);
-		prefetch(next);
-		prefetch_stack(next);
-		clear_cpuidle_map(cpu);
+		if (likely(next->prio != PRIO_LIMIT)) {
+			prefetch(next);
+			prefetch_stack(next);
+			clear_cpuidle_map(cpu);
+		} else
+			set_cpuidle_map(cpu);
 	}
 
 	if (likely(prev != next)) {
+		/*
+		 * Don't stick tasks when a real time task is going to run as
+		 * they may literally get stuck.
+		 */
+		if (rt_task(next))
+			unstick_task(rq, prev);
 		sched_info_switch(prev, next);
 		perf_event_task_sched_out(prev, next);
 
-		if (prev != idle)
-			set_last_task(rq, prev);
 		set_rq_task(rq, next);
 		grq.nr_switches++;
 		prev->oncpu = 0;
@@ -3115,7 +3288,7 @@ void complete_all(struct completion *x)
 EXPORT_SYMBOL(complete_all);
 
 static inline long __sched
-do_wait_for_common(struct completion *x, long timeout, int state, int iowait)
+do_wait_for_common(struct completion *x, long timeout, int state)
 {
 	if (!x->done) {
 		DECLARE_WAITQUEUE(wait, current);
@@ -3128,10 +3301,7 @@ do_wait_for_common(struct completion *x, long timeout, int state, int iowait)
 			}
 			__set_current_state(state);
 			spin_unlock_irq(&x->wait.lock);
-			if (iowait)
-				timeout = io_schedule_timeout(timeout);
-			else
-				timeout = schedule_timeout(timeout);
+			timeout = schedule_timeout(timeout);
 			spin_lock_irq(&x->wait.lock);
 		} while (!x->done && timeout);
 		__remove_wait_queue(&x->wait, &wait);
@@ -3143,12 +3313,12 @@ do_wait_for_common(struct completion *x, long timeout, int state, int iowait)
 }
 
 static long __sched
-wait_for_common(struct completion *x, long timeout, int state, int iowait)
+wait_for_common(struct completion *x, long timeout, int state)
 {
 	might_sleep();
 
 	spin_lock_irq(&x->wait.lock);
-	timeout = do_wait_for_common(x, timeout, state, iowait);
+	timeout = do_wait_for_common(x, timeout, state);
 	spin_unlock_irq(&x->wait.lock);
 	return timeout;
 }
@@ -3165,22 +3335,9 @@ wait_for_common(struct completion *x, long timeout, int state, int iowait)
  */
 void __sched wait_for_completion(struct completion *x)
 {
-	wait_for_common(x, MAX_SCHEDULE_TIMEOUT, TASK_UNINTERRUPTIBLE, 0);
+	wait_for_common(x, MAX_SCHEDULE_TIMEOUT, TASK_UNINTERRUPTIBLE);
 }
 EXPORT_SYMBOL(wait_for_completion);
-
-/**
- * wait_for_completion_io: - waits for completion of a task
- * @x:  holds the state of this particular completion
- *
- * This waits for completion of a specific task to be signaled. Treats any
- * sleeping as waiting for IO for the purposes of process accounting.
- */
-void __sched wait_for_completion_io(struct completion *x)
-{
-	wait_for_common(x, MAX_SCHEDULE_TIMEOUT, TASK_UNINTERRUPTIBLE, 1);
-}
-EXPORT_SYMBOL(wait_for_completion_io);
 
 /**
  * wait_for_completion_timeout: - waits for completion of a task (w/timeout)
@@ -3194,7 +3351,7 @@ EXPORT_SYMBOL(wait_for_completion_io);
 unsigned long __sched
 wait_for_completion_timeout(struct completion *x, unsigned long timeout)
 {
-	return wait_for_common(x, timeout, TASK_UNINTERRUPTIBLE, 0);
+	return wait_for_common(x, timeout, TASK_UNINTERRUPTIBLE);
 }
 EXPORT_SYMBOL(wait_for_completion_timeout);
 
@@ -3207,7 +3364,7 @@ EXPORT_SYMBOL(wait_for_completion_timeout);
  */
 int __sched wait_for_completion_interruptible(struct completion *x)
 {
-	long t = wait_for_common(x, MAX_SCHEDULE_TIMEOUT, TASK_INTERRUPTIBLE, 0);
+	long t = wait_for_common(x, MAX_SCHEDULE_TIMEOUT, TASK_INTERRUPTIBLE);
 	if (t == -ERESTARTSYS)
 		return t;
 	return 0;
@@ -3226,7 +3383,7 @@ unsigned long __sched
 wait_for_completion_interruptible_timeout(struct completion *x,
 					  unsigned long timeout)
 {
-	return wait_for_common(x, timeout, TASK_INTERRUPTIBLE, 0);
+	return wait_for_common(x, timeout, TASK_INTERRUPTIBLE);
 }
 EXPORT_SYMBOL(wait_for_completion_interruptible_timeout);
 
@@ -3239,7 +3396,7 @@ EXPORT_SYMBOL(wait_for_completion_interruptible_timeout);
  */
 int __sched wait_for_completion_killable(struct completion *x)
 {
-	long t = wait_for_common(x, MAX_SCHEDULE_TIMEOUT, TASK_KILLABLE, 0);
+	long t = wait_for_common(x, MAX_SCHEDULE_TIMEOUT, TASK_KILLABLE);
 	if (t == -ERESTARTSYS)
 		return t;
 	return 0;
@@ -3259,7 +3416,7 @@ unsigned long __sched
 wait_for_completion_killable_timeout(struct completion *x,
 				     unsigned long timeout)
 {
-	return wait_for_common(x, timeout, TASK_KILLABLE, 0);
+	return wait_for_common(x, timeout, TASK_KILLABLE);
 }
 EXPORT_SYMBOL(wait_for_completion_killable_timeout);
 
@@ -3514,7 +3671,7 @@ SYSCALL_DEFINE1(nice, int, increment)
  *
  * This is the priority value as seen by users in /proc.
  * RT tasks are offset by -100. Normal tasks are centered around 1, value goes
- * from 0 (SCHED_ISO) upwards (to nice +19 SCHED_IDLEPRIO).
+ * from 0 (SCHED_ISO) up to 82 (nice +19 SCHED_IDLEPRIO).
  */
 int task_prio(const struct task_struct *p)
 {
@@ -3526,12 +3683,8 @@ int task_prio(const struct task_struct *p)
 
 	/* Convert to ms to avoid overflows */
 	delta = NS_TO_MS(p->deadline - grq.niffies);
-	if (fork_depth_penalty)
-		delta *= 4;
-	else
-		delta *= 40;
-	delta /= ms_longest_deadline_diff();
-	if (delta > 0)
+	delta = delta * 40 / ms_longest_deadline_diff();
+	if (delta > 0 && delta <= 80)
 		prio += delta;
 	if (idleprio_task(p))
 		prio += 40;
@@ -3663,8 +3816,8 @@ recheck:
 	 * SCHED_BATCH is 0.
 	 */
 	if (param->sched_priority < 0 ||
-	    (p->mm && param->sched_priority > MAX_USER_RT_PRIO-1) ||
-	    (!p->mm && param->sched_priority > MAX_RT_PRIO-1))
+	    (p->mm && param->sched_priority > MAX_USER_RT_PRIO - 1) ||
+	    (!p->mm && param->sched_priority > MAX_RT_PRIO - 1))
 		return -EINVAL;
 	if (is_rt_policy(policy) != (param->sched_priority != 0))
 		return -EINVAL;
@@ -4196,9 +4349,9 @@ void __sched io_schedule(void)
 
 	delayacct_blkio_start();
 	atomic_inc(&rq->nr_iowait);
-	current->sched_in_iowait = 1;
+	current->in_iowait = 1;
 	schedule();
-	current->sched_in_iowait = 0;
+	current->in_iowait = 0;
 	atomic_dec(&rq->nr_iowait);
 	delayacct_blkio_end();
 }
@@ -4211,9 +4364,9 @@ long __sched io_schedule_timeout(long timeout)
 
 	delayacct_blkio_start();
 	atomic_inc(&rq->nr_iowait);
-	current->sched_in_iowait = 1;
+	current->in_iowait = 1;
 	ret = schedule_timeout(timeout);
-	current->sched_in_iowait = 0;
+	current->in_iowait = 0;
 	atomic_dec(&rq->nr_iowait);
 	delayacct_blkio_end();
 	return ret;
@@ -4399,10 +4552,12 @@ void init_idle(struct task_struct *idle, int cpu)
 	idle->prio = PRIO_LIMIT;
 	set_rq_task(rq, idle);
 	idle->cpus_allowed = cpumask_of_cpu(cpu);
+	/* Silence PROVE_RCU */
+	rcu_read_lock();
 	set_task_cpu(idle, cpu);
+	rcu_read_unlock();
 	rq->curr = rq->idle = idle;
 	idle->oncpu = 1;
-	set_cpuidle_map(cpu);
 	grq_unlock_irqrestore(&flags);
 
 	/* Set the preempt count _outside_ the spinlocks! */
@@ -4776,6 +4931,30 @@ void move_task_off_dead_cpu(int dead_cpu, struct task_struct *p)
 
 }
 
+/* Run through task list and find tasks affined to just the dead cpu, then
+ * allocate a new affinity */
+static void break_sole_affinity(int src_cpu)
+{
+	struct task_struct *p, *t;
+
+	do_each_thread(t, p) {
+		if (!online_cpus(p)) {
+			cpumask_copy(&p->cpus_allowed, cpu_possible_mask);
+			/*
+			 * Don't tell them about moving exiting tasks or
+			 * kernel threads (both mm NULL), since they never
+			 * leave kernel.
+			 */
+			if (p->mm && printk_ratelimit()) {
+				printk(KERN_INFO "process %d (%s) no "
+				       "longer affine to cpu %d\n",
+				       task_pid_nr(p), p->comm, src_cpu);
+			}
+		}
+		clear_sticky(p);
+	} while_each_thread(t, p);
+}
+
 /*
  * Schedules idle task to be the next runnable task on current CPU.
  * It does so by boosting its priority to highest possible.
@@ -4796,6 +4975,7 @@ void sched_idle_next(void)
 	 * and interrupts disabled on the current cpu.
 	 */
 	grq_lock_irqsave(&flags);
+	break_sole_affinity(this_cpu);
 
 	__setscheduler(idle, rq, SCHED_FIFO, MAX_RT_PRIO - 1);
 
@@ -5032,6 +5212,7 @@ migration_call(struct notifier_block *nfb, unsigned long action, void *hcpu)
 
 			set_rq_online(rq);
 		}
+		grq.noc = num_online_cpus();
 		grq_unlock_irqrestore(&flags);
 		break;
 
@@ -5058,6 +5239,7 @@ migration_call(struct notifier_block *nfb, unsigned long action, void *hcpu)
 			BUG_ON(!cpumask_test_cpu(cpu, rq->rd->span));
 			set_rq_offline(rq);
 		}
+		grq.noc = num_online_cpus();
 		grq_unlock_irqrestore(&flags);
 		break;
 #endif
@@ -6624,7 +6806,7 @@ static int cache_cpu_idle(unsigned long cpu)
 void __init sched_init_smp(void)
 {
 	struct sched_domain *sd;
-	int cpu, cpus;
+	int cpu;
 
 	cpumask_var_t non_isolated_cpus;
 
@@ -6658,14 +6840,6 @@ void __init sched_init_smp(void)
 		BUG();
 	free_cpumask_var(non_isolated_cpus);
 
-	/*
-	 * Assume that every added cpu gives us slightly less overall latency
-	 * allowing us to increase the base rr_interval, non-linearly and with
-	 * an upper bound.
-	 */
-	cpus = num_online_cpus();
-	rr_interval = rr_interval * (4 * cpus + 4) / (cpus + 6);
-
 	grq_lock_irq();
 	/*
 	 * Set up the relative cache distance of each online cpu from each
@@ -6694,10 +6868,12 @@ void __init sched_init_smp(void)
 					cpumask_set_cpu(other_cpu, &rq->cache_siblings);
 			}
 #endif
-			if (sd->level <= SD_LV_MC)
-				locality = 0;
-			else if (sd->level <= SD_LV_NODE)
+			if (sd->level <= SD_LV_SIBLING)
 				locality = 1;
+			else if (sd->level <= SD_LV_MC)
+				locality = 2;
+			else if (sd->level <= SD_LV_NODE)
+				locality = 3;
 			else
 				continue;
 
@@ -6752,6 +6928,7 @@ void __init sched_init(void)
 	grq.last_jiffy = jiffies;
 	raw_spin_lock_init(&grq.iso_lock);
 	grq.iso_ticks = grq.iso_refractory = 0;
+	grq.noc = 1;
 #ifdef CONFIG_SMP
 	init_defrootdomain();
 	grq.qnr = grq.idle_cpus = 0;
@@ -6765,6 +6942,7 @@ void __init sched_init(void)
 			      rq->iowait_pc = rq->idle_pc = 0;
 		rq->dither = 0;
 #ifdef CONFIG_SMP
+		rq->sticky_task = NULL;
 		rq->last_niffy = 0;
 		rq->sd = NULL;
 		rq->rd = NULL;
@@ -6803,7 +6981,7 @@ void __init sched_init(void)
 			if (i == j)
 				rq->cpu_locality[j] = 0;
 			else
-				rq->cpu_locality[j] = 3;
+				rq->cpu_locality[j] = 4;
 		}
 	}
 #endif

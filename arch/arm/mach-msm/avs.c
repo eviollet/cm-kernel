@@ -97,7 +97,7 @@ struct clkctl_acpu_speed {
   unsigned	acpu_khz;
   int		min_vdd;
   int		max_vdd;
-  unsigned	ignore;		// Set to 1 if this frequency is to be ignored
+  unsigned	ignore;	// Set to 1 if this frequency is to be ignored
 };
 
 #ifndef MAX
@@ -107,40 +107,35 @@ struct clkctl_acpu_speed {
 struct clkctl_acpu_speed acpu_vdd_tbl[] = {
   {  19200, VOLTAGE_MIN_START, 975, 1 },
   { 128000, VOLTAGE_MIN_START, 975, 0 },
-  { 245000, VOLTAGE_MIN_START, 1000, 0 },
-	{ 256000, VOLTAGE_MIN_START, 1000, 1 },
-	{ 384000, VOLTAGE_MIN_START, 1025, 0 },
- 	{ 422400, VOLTAGE_MIN_START, 1050, 0 },
-	{ 460800, VOLTAGE_MIN_START, 1050, 0 },
-	{ 499200, MAX(VOLTAGE_MIN_START,900), 1075, 0 },
-	{ 537600, MAX(VOLTAGE_MIN_START,900), 1075, 0 },
-	{ 576000, MAX(VOLTAGE_MIN_START,950), 1100, 0 },
-	{ 614400, MAX(VOLTAGE_MIN_START,950), 1100, 0 },
-	{ 652800, MAX(VOLTAGE_MIN_START,950), 1125, 0 },
-	{ 691200, MAX(VOLTAGE_MIN_START,975), 1150, 0 },
-	{ 729600, MAX(VOLTAGE_MIN_START,975), 1175, 0 },
-	{ 768000, MAX(VOLTAGE_MIN_START,975), 1200, 0 },
-	{ 806400, 1175, 1225, 0 },
-	{ 844800, 1200, 1250, 0 },
-	{ 883200, 1200, 1250, 0 },
-	{ 921600, 1225, 1275, 0 },
-	{ 960000, 1225, 1275, 0 },
-	{ 998400, 1225, 1275, 0 },
-#ifdef	USE_OVERCLOCKING
-	{ 1036800, 1225, 1275, 0 },
-	{ 1075200, 1225, 1275, 0 },
-	{ 1113600, 1250, 1325, 0 },
-#endif
-#ifdef	USE_EXTREMEOVERCLOCKING
-	{ 1152000, 1250, 1350, 0 },
-	{ 1190400, 1250, 1350, 0 },
-#endif
-	{ 0 },
+  { 245760, VOLTAGE_MIN_START, 1000, 0 },
+  //{ 256000, VOLTAGE_MIN_START, 1000, 0 },
+  { 384000, VOLTAGE_MIN_START, 1025, 0 },
+  { 422400, VOLTAGE_MIN_START, 1050, 0 },
+  { 460800, VOLTAGE_MIN_START, 1050, 0 },
+  { 499200, MAX(VOLTAGE_MIN_START,900), 1075, 0 },
+  { 537600, MAX(VOLTAGE_MIN_START,900), 1075, 0 },
+  { 576000, MAX(VOLTAGE_MIN_START,950), 1100, 0 },
+  { 614400, MAX(VOLTAGE_MIN_START,950), 1100, 0 },
+  { 652800, MAX(VOLTAGE_MIN_START,950), 1125, 0 },
+  { 691200, MAX(VOLTAGE_MIN_START,975), 1150, 0 },
+  { 729600, MAX(VOLTAGE_MIN_START,975), 1175, 0 },
+  { 768000, MAX(VOLTAGE_MIN_START,975), 1200, 0 },
+  { 806400, 1175, 1225, 0 },
+  { 844800, 1200, 1250, 0 },
+  { 883200, 1200, 1250, 0 },
+  { 921600, 1225, 1275, 0 },
+  { 960000, 1225, 1275, 0 },
+  { 998400, 1225, 1275, 0 },
+  { 1036800, 1225, 1275, 0 },
+  { 1075200, 1225, 1275, 0 },
+  { 1113600, 1250, 1325, 0 },
+  { 1152000, 1250, 1350, 0 },
+  { 1190400, 1250, 1350, 0 },
+  { 0 },
 };
 
 #if defined(CONFIG_CPU_FREQ_VDD_LEVELS) && defined(CONFIG_MSM_CPU_AVS)
-ssize_t acpuclk_get_vdd_levels_havs_str(char *buf)
-{
+ssize_t acpuclk_get_vdd_levels_havs_str(char *buf) {
   int i, len = 0;
   if (buf) {
     for (i = 0; acpu_vdd_tbl[i].acpu_khz; i++) {
@@ -449,5 +444,4 @@ void __exit avs_exit()
 
 	kfree(avs_state.avs_v);
 }
-
 

@@ -32,9 +32,9 @@ struct cfq_io_context {
  * the corresponding I/O scheduler needs to see a ioprio update.
  */
 enum {
-        IOC_CFQ_IOPRIO_CHANGED,
-        IOC_BFQ_IOPRIO_CHANGED,
-        IOC_IOPRIO_CHANGED_BITS
+	IOC_CFQ_IOPRIO_CHANGED,
+	IOC_BFQ_IOPRIO_CHANGED,
+	IOC_IOPRIO_CHANGED_BITS
 };
 
 /*

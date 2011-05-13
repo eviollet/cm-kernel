@@ -242,6 +242,19 @@ msm_pm_exit_restore_hw(void)
 #endif
 }
 
+/*
+ * For speeding up boot time:
+ * During booting up, disable entering arch_idle() by disable_hlt()
+ * Enable it after booting up BOOT_LOCK_TIMEOUT sec.
+ */
+#define BOOT_LOCK_TIMEOUT      (60 * HZ)
+static void do_expire_boot_lock(struct work_struct *work)
+{
+        enable_hlt();
+        pr_info("Release 'boot-time' halt_lock\n");
+}
+static DECLARE_DELAYED_WORK(work_expire_boot_lock, do_expire_boot_lock);
+
 #ifdef CONFIG_MSM_FIQ_SUPPORT
 void msm_fiq_exit_sleep(void);
 #else
@@ -376,7 +389,7 @@ static int msm_sleep(int sleep_mode, uint32_t sleep_delay, int from_idle)
 	}
 
 	if (sleep_mode <= MSM_PM_SLEEP_MODE_RAMP_DOWN_AND_WAIT_FOR_INTERRUPT) {
-		pm_saved_acpu_clk_rate = acpuclk_power_collapse();
+		pm_saved_acpu_clk_rate = acpuclk_power_collapse(from_idle);
 		if (msm_pm_debug_mask & MSM_PM_DEBUG_CLOCK)
 			printk(KERN_INFO "msm_sleep(): %ld enter power collapse"
 			       "\n", pm_saved_acpu_clk_rate);
@@ -541,7 +554,12 @@ void arch_idle(void)
 		if (msm_pm_debug_mask & MSM_PM_DEBUG_CLOCK)
 			printk(KERN_DEBUG "msm_sleep: clk swfi -> %ld\n",
 				saved_rate);
-		if (acpuclk_set_rate(saved_rate, 1) < 0)
+#if defined(CONFIG_ARCH_QSD8X50)
+    if (saved_rate && acpuclk_set_rate(saved_rate, SETRATE_SWFI) < 0)
+#else
+    if (saved_rate
+        && acpuclk_set_rate(saved_rate, SETRATE_SWFI) < 0)
+#endif
 			printk(KERN_ERR "msm_sleep(): clk_set_rate %ld "
 			       "failed\n", saved_rate);
 #ifdef CONFIG_MSM_IDLE_STATS
@@ -625,7 +643,7 @@ void msm_pm_flush_console(void)
 	release_console_sem();
 }
 
-static void msm_pm_restart(char str)
+static void msm_pm_restart(char str, const char *cmd)
 {
 	msm_pm_flush_console();
 

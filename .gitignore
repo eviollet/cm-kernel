@@ -79,6 +79,8 @@ GTAGS
 \#*#
 
 # compressed boot files
+kernel.zip
+kernel-signed.zip
 arch/arm/boot/compressed/lib1funcs.S
 arch/arm/boot/compressed/piggy.gzip
 arch/arm/boot/compressed/vmlinux
