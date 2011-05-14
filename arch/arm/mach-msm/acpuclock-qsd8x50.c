@@ -80,7 +80,7 @@ struct clkctl_acpu_speed acpu_freq_tbl[] = {
   {  19200, CCTL(CLK_TCXO, 1),		SRC_RAW, 0, 0, 1050, 14000, 1 },
   { 128000, CCTL(CLK_TCXO, 1),		SRC_AXI, 0, 0, 1050, 14000 , 0 },
   { 245000, CCTL(CLK_MODEM_PLL, 1),	SRC_RAW, 0, 0, 1050, 29000 , 0 },
-  { 256000, CCTL(CLK_GLOBAL_PLL, 3),	SRC_RAW, 0, 0, 1050, 29000 , 1 },
+  //{ 256000, CCTL(CLK_GLOBAL_PLL, 3),	SRC_RAW, 0, 0, 1050, 29000 , 1 },
   { 384000, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0A, 0, 1050, 58000 , 0 },
   { 422400, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0B, 0, 1050, 117000 , 0 },
   { 460800, CCTL(CLK_TCXO, 1),		SRC_SCPLL, 0x0C, 0, 1050, 117000 , 1 },
@@ -131,14 +131,14 @@ static void __init acpuclk_init_cpufreq_table(void)
 		freq_table[i].frequency = CPUFREQ_ENTRY_INVALID;
 
 		/* Skip speeds using the global pll */
-		if (acpu_freq_tbl[i].ignore==1) {
-		  continue;
-		}
 		/*if (acpu_freq_tbl[i].acpu_khz == 256000 ||
 				acpu_freq_tbl[i].acpu_khz == 19200)
 				continue;*/
 
 		vdd = acpu_freq_tbl[i].vdd;
+		if (acpu_freq_tbl[i].ignore==1) {
+		  continue;
+		}
 		/* Allow mpll and the first scpll speeds */
 		if (acpu_freq_tbl[i].acpu_khz == acpu_mpll->acpu_khz ||
 				acpu_freq_tbl[i].acpu_khz == 384000) {

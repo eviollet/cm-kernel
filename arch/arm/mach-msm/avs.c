@@ -107,7 +107,8 @@ struct clkctl_acpu_speed {
 struct clkctl_acpu_speed acpu_vdd_tbl[] = {
   {  19200, VOLTAGE_MIN_START, 975, 1 },
   { 128000, VOLTAGE_MIN_START, 975, 0 },
-  { 245760, VOLTAGE_MIN_START, 1000, 0 },
+  { 245000, VOLTAGE_MIN_START, 1000, 0 },
+  //{ 245760, VOLTAGE_MIN_START, 1000, 0 },
   //{ 256000, VOLTAGE_MIN_START, 1000, 0 },
   { 384000, VOLTAGE_MIN_START, 1025, 0 },
   { 422400, VOLTAGE_MIN_START, 1050, 0 },
@@ -299,7 +300,7 @@ static int avs_set_target_voltage(int freq_idx, bool update_table)
 	new_voltage = avs_get_target_voltage(freq_idx, update_table);
 	if (avs_state.vdd != new_voltage) {
 	  /*AVSDEBUG*/
-	  pr_info("AVS setting V to %d mV @%d MHz\n", new_voltage, acpu_vdd_tbl[freq_idx].acpu_khz / 1000);
+	  //pr_info("AVS setting V to %d mV @%d MHz\n", new_voltage, acpu_vdd_tbl[freq_idx].acpu_khz / 1000);
 		rc = avs_state.set_vdd(new_voltage);
 		while (rc && ctr) {
 			rc = avs_state.set_vdd(new_voltage);
