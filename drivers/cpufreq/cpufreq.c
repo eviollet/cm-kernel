@@ -28,7 +28,7 @@
 #include <linux/cpu.h>
 #include <linux/completion.h>
 #include <linux/mutex.h>
-#include <linux/earlysuspend.h>
+#include <linux/sched.h>
 
 #define dprintk(msg...) cpufreq_debug_printk(CPUFREQ_DEBUG_CORE, \
 						"cpufreq-core", msg)
@@ -450,7 +450,6 @@ out:
 static ssize_t show_##file_name				\
 (struct cpufreq_policy *policy, char *buf)		\
 {							\
-  /*  printk("show_one(%s, %s)=>%u\n", #file_name, #object, policy->object); */ \
 	return sprintf(buf, "%u\n", policy->object);	\
 }
 
@@ -474,9 +473,7 @@ static ssize_t store_##file_name					\
 	unsigned int ret = -EINVAL;					\
 	struct cpufreq_policy new_policy;				\
 									\
-	/*printk("stor_one(%s, %s):%s\n", #file_name, #object, buf);*/	\
 	ret = cpufreq_get_policy(&new_policy, policy->cpu);		\
-	/*printk("new_policy->%s=%d\n", #object, new_policy.object);*/	\
 	if (ret)							\
 		return -EINVAL;						\
 									\
@@ -492,6 +489,7 @@ static ssize_t store_##file_name					\
 
 store_one(scaling_min_freq, min);
 store_one(scaling_max_freq, max);
+
 /**
  * show_cpuinfo_cur_freq - current CPU frequency as detected by hardware
  */
@@ -1185,9 +1183,7 @@ static int cpufreq_add_dev(struct sys_device *sys_dev)
 	/* call driver. From then on the cpufreq must be able
 	 * to accept all calls to ->verify and ->setpolicy for this CPU
 	 */
-	//printk("*** before cpufreq_driver->init()\n");
 	ret = cpufreq_driver->init(policy);
-	//printk("*** after cpufreq_driver->init()\n");
 	if (ret) {
 		dprintk("initialization failed\n");
 		goto err_unlock_policy;
@@ -1195,14 +1191,10 @@ static int cpufreq_add_dev(struct sys_device *sys_dev)
 	policy->user_policy.min = policy->min;
 	policy->user_policy.max = policy->max;
 
-	//	printk("1-policy->min=%d, policy->max=%d\n", policy->min, policy->max);
-
 	blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
 				     CPUFREQ_START, policy);
 
-	//printk("2-policy->min=%d, policy->max=%d\n", policy->min, policy->max);
 	ret = cpufreq_add_dev_policy(cpu, policy, sys_dev);
-	//printk("3-policy->min=%d, policy->max=%d\n", policy->min, policy->max);
 	if (ret) {
 		if (ret > 0)
 			/* This is a managed cpu, symlink created,
@@ -1211,21 +1203,16 @@ static int cpufreq_add_dev(struct sys_device *sys_dev)
 		goto err_unlock_policy;
 	}
 
-	//printk("4-policy->min=%d, policy->max=%d\n", policy->min, policy->max);
 	ret = cpufreq_add_dev_interface(cpu, policy, sys_dev);
-	//printk("5-policy->min=%d, policy->max=%d\n", policy->min, policy->max);
 	if (ret)
 		goto err_out_unregister;
 
-	//printk("6-policy->min=%d, policy->max=%d\n", policy->min, policy->max);
 	unlock_policy_rwsem_write(cpu);
 
-	//printk("7-policy->min=%d, policy->max=%d\n", policy->min, policy->max);
 	kobject_uevent(&policy->kobj, KOBJ_ADD);
 	module_put(cpufreq_driver->owner);
 	dprintk("initialization complete\n");
 	cpufreq_debug_enable_ratelimit();
-	//printk("8-policy->min=%d, policy->max=%d\n", policy->min, policy->max);
 
 	return 0;
 
@@ -1691,6 +1678,12 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
 		target_freq, relation);
 	if (cpu_online(policy->cpu) && cpufreq_driver->target)
 		retval = cpufreq_driver->target(policy, target_freq, relation);
+	if (likely(retval != -EINVAL)) {
+		if (target_freq == policy->max)
+			cpu_nonscaling(policy->cpu);
+		else
+			cpu_scaling(policy->cpu);
+	}
 
 	return retval;
 }
@@ -2150,25 +2143,6 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver)
 }
 EXPORT_SYMBOL_GPL(cpufreq_unregister_driver);
 
-static int	cpufreq_screen_state=1;
-int	cpufreq_get_screen_state(void) {
-  return(cpufreq_screen_state);
-}
-
-static void cpufreq_early_suspend(struct early_suspend *handler) {
-  cpufreq_screen_state=0;
-}
-
-static void cpufreq_late_resume(struct early_suspend *handler) {
-  cpufreq_screen_state=1;
-}
-
-static struct early_suspend cpufreq_power_suspend = {
-	.suspend = cpufreq_early_suspend,
-	.resume = cpufreq_late_resume,
-};
-
-
 static int __init cpufreq_core_init(void)
 {
 	int cpu;
@@ -2181,8 +2155,6 @@ static int __init cpufreq_core_init(void)
 	cpufreq_global_kobject = kobject_create_and_add("cpufreq",
 						&cpu_sysdev_class.kset.kobj);
 	BUG_ON(!cpufreq_global_kobject);
-
-	register_early_suspend(&cpufreq_power_suspend);	
 
 	return 0;
 }
