@@ -23,12 +23,6 @@ config CONSTRUCTORS
 
 menu "General setup"
 
-choice
-	prompt "CPU Scheduler"
-	default SCHED_BFS
-	---help---
-	  Select the CPU Scheduler to be used.
-
 config SCHED_BFS
 	bool "BFS cpu scheduler"
 	---help---
@@ -40,11 +34,7 @@ config SCHED_BFS
           TEST so these options are disabled.
 
           Say Y here.
-config SCHED_CFS
-	bool "CFS cpu scheduler"
-	---help---
-	This is the default cpu scheduler found in the upstream kernel.
-endchoice
+	default y
 
 config EXPERIMENTAL
 	bool "Prompt for development and/or incomplete code/drivers"
@@ -356,15 +346,6 @@ menu "RCU Subsystem"
 choice
 	prompt "RCU Implementation"
 	default TREE_RCU
-
-config CLASSIC_RCU
-	bool "Classic RCU"
-	help
-	  This option selects the classic RCU implementation that is
-	  designed for best read-side performance on non-realtime
-	  systems.
-
-	  Select this option if you are unsure.
 
 config TREE_RCU
 	bool "Tree-based hierarchical RCU"
