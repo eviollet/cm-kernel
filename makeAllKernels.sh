@@ -8,7 +8,7 @@ fi
 
 kernelBaseName=$1
 
-for kernel in HAVS-AXI-128-CFS GB-HAVS-AXI-128-CFS HAVS-128-CFS GB-HAVS-128-CFS SVS-AXI-128-CFS GB-SVS-AXI-128-CFS SVS-128-CFS GB-SVS-128-CFS
+for kernel in GB-HAVS-AXI-128-CFS GB-HAVS-128-CFS GB-SVS-AXI-128-CFS GB-SVS-128-CFS GB-HAVS-AXI-128-BFS GB-HAVS-128-BFS GB-SVS-AXI-128-BFS GB-SVS-128-BFS
 do
     echo "************************************"
     echo "***** Make $kernel ...."
