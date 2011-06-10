@@ -2,10 +2,17 @@
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.35.13
 <<<<<<< HEAD
+<<<<<<< HEAD
 # Thu Jun  9 22:24:57 2011
 =======
 # Tue Nov  1 23:24:32 2011
 >>>>>>> 1fa9a20... New version number
+=======
+# Tue Nov  1 23:24:32 2011
+=======
+# Thu Jun  9 22:24:57 2011
+>>>>>>> f6b4780... Fixed VPN on MIUI (and perhaps other ROMs) thanks to mondilv@xda
+>>>>>>> 6f3a386... Fixed VPN on MIUI (and perhaps other ROMs) thanks to mondilv@xda
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -40,7 +47,15 @@ CONFIG_BROKEN_ON_SMP=y
 CONFIG_LOCK_KERNEL=y
 CONFIG_INIT_ENV_ARG_LIMIT=32
 CONFIG_CROSS_COMPILE=""
+<<<<<<< HEAD
 CONFIG_LOCALVERSION="-ManU-2.1.1-GB-HAVS-AXI-128-CFS"
+=======
+<<<<<<< HEAD
+CONFIG_LOCALVERSION="-ManU-2.0.2-GB-HAVS-AXI-128-CFS"
+=======
+CONFIG_LOCALVERSION="-ManU-2.1.1-GB-HAVS-AXI-128-CFS"
+>>>>>>> f6b4780... Fixed VPN on MIUI (and perhaps other ROMs) thanks to mondilv@xda
+>>>>>>> 6f3a386... Fixed VPN on MIUI (and perhaps other ROMs) thanks to mondilv@xda
 # CONFIG_LOCALVERSION_AUTO is not set
 CONFIG_HAVE_KERNEL_GZIP=y
 CONFIG_HAVE_KERNEL_LZMA=y

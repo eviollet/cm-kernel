@@ -1,7 +1,11 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.35.13
+<<<<<<< HEAD
 # Sat May 28 10:17:43 2011
+=======
+# Fri Nov  4 21:45:06 2011
+>>>>>>> 6f3a386... Fixed VPN on MIUI (and perhaps other ROMs) thanks to mondilv@xda
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -36,7 +40,11 @@ CONFIG_BROKEN_ON_SMP=y
 CONFIG_LOCK_KERNEL=y
 CONFIG_INIT_ENV_ARG_LIMIT=32
 CONFIG_CROSS_COMPILE=""
+<<<<<<< HEAD
 CONFIG_LOCALVERSION="-ManU-2.1.1-GB-HAVS-AXI-128-BFS"
+=======
+CONFIG_LOCALVERSION="-ManU-2.0.2-GB-HAVS-AXI-128-BFS"
+>>>>>>> 6f3a386... Fixed VPN on MIUI (and perhaps other ROMs) thanks to mondilv@xda
 # CONFIG_LOCALVERSION_AUTO is not set
 CONFIG_HAVE_KERNEL_GZIP=y
 CONFIG_HAVE_KERNEL_LZMA=y
@@ -68,11 +76,15 @@ CONFIG_CGROUPS=y
 # CONFIG_CGROUP_FREEZER is not set
 # CONFIG_CGROUP_DEVICE is not set
 # CONFIG_CPUSETS is not set
+<<<<<<< HEAD
 CONFIG_CGROUP_CPUACCT=y
 # CONFIG_RESOURCE_COUNTERS is not set
 CONFIG_CGROUP_SCHED=y
 CONFIG_FAIR_GROUP_SCHED=y
 CONFIG_RT_GROUP_SCHED=y
+=======
+# CONFIG_RESOURCE_COUNTERS is not set
+>>>>>>> 6f3a386... Fixed VPN on MIUI (and perhaps other ROMs) thanks to mondilv@xda
 # CONFIG_BLK_CGROUP is not set
 # CONFIG_SYSFS_DEPRECATED_V2 is not set
 # CONFIG_RELAY is not set
@@ -129,9 +141,13 @@ CONFIG_HAVE_CLK=y
 #
 # GCOV-based kernel profiling
 #
+<<<<<<< HEAD
 # CONFIG_GCOV_KERNEL is not set
 CONFIG_SLOW_WORK=y
 # CONFIG_SLOW_WORK_DEBUG is not set
+=======
+CONFIG_SLOW_WORK=y
+>>>>>>> 6f3a386... Fixed VPN on MIUI (and perhaps other ROMs) thanks to mondilv@xda
 CONFIG_HAVE_GENERIC_DMA_COHERENT=y
 CONFIG_RT_MUTEXES=y
 CONFIG_BASE_SMALL=0
@@ -153,7 +169,11 @@ CONFIG_IOSCHED_NOOP=y
 CONFIG_IOSCHED_DEADLINE=y
 CONFIG_IOSCHED_CFQ=y
 CONFIG_IOSCHED_BFQ=y
+<<<<<<< HEAD
 # CONFIG_CGROUP_BFQIO is not set
+=======
+CONFIG_CGROUP_BFQIO=y
+>>>>>>> 6f3a386... Fixed VPN on MIUI (and perhaps other ROMs) thanks to mondilv@xda
 # CONFIG_DEFAULT_DEADLINE is not set
 # CONFIG_DEFAULT_CFQ is not set
 # CONFIG_DEFAULT_BFQ is not set
@@ -261,7 +281,11 @@ CONFIG_MSM_REMOTE_SPINLOCK=y
 # Qualcomm MSM Board Type
 #
 # CONFIG_MACH_SWORDFISH is not set
+<<<<<<< HEAD
 # CONFIG_MACH_QSD8X50_SURF is not set
+=======
+CONFIG_MACH_QSD8X50_SURF=y
+>>>>>>> 6f3a386... Fixed VPN on MIUI (and perhaps other ROMs) thanks to mondilv@xda
 # CONFIG_MACH_QSD8X50A_ST1_5 is not set
 CONFIG_MSM_DEBUG_UART_NONE=y
 # CONFIG_MSM_DEBUG_UART1 is not set
@@ -421,7 +445,15 @@ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
 # CONFIG_CPU_FREQ_DEFAULT_GOV_CONSERVATIVE is not set
 # CONFIG_CPU_FREQ_DEFAULT_GOV_INTERACTIVE is not set
 # CONFIG_CPU_FREQ_DEFAULT_GOV_SMARTASS is not set
+<<<<<<< HEAD
 CONFIG_CPU_FREQ_GOV_SMARTASS=y
+=======
+# CONFIG_CPU_FREQ_DEFAULT_GOV_LAZY is not set
+# CONFIG_CPU_FREQ_DEFAULT_GOV_SMARTASS2 is not set
+CONFIG_CPU_FREQ_GOV_SMARTASS=y
+CONFIG_CPU_FREQ_GOV_LAZY=y
+CONFIG_CPU_FREQ_GOV_SMARTASS2=y
+>>>>>>> 6f3a386... Fixed VPN on MIUI (and perhaps other ROMs) thanks to mondilv@xda
 CONFIG_CPU_FREQ_GOV_PERFORMANCE=y
 CONFIG_CPU_FREQ_GOV_POWERSAVE=y
 CONFIG_CPU_FREQ_GOV_USERSPACE=y
@@ -766,7 +798,11 @@ CONFIG_NET_SCH_FIFO=y
 # CONFIG_IRDA is not set
 CONFIG_BT=y
 CONFIG_BT_L2CAP=y
+<<<<<<< HEAD
 # CONFIG_BT_L2CAP_EXT_FEATURES is not set
+=======
+CONFIG_BT_L2CAP_EXT_FEATURES=y
+>>>>>>> 6f3a386... Fixed VPN on MIUI (and perhaps other ROMs) thanks to mondilv@xda
 CONFIG_BT_SCO=y
 CONFIG_BT_RFCOMM=y
 CONFIG_BT_RFCOMM_TTY=y
