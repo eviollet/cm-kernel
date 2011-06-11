@@ -951,7 +951,7 @@ unknown:
 		case USB_RECIP_INTERFACE:
 			if (cdev->config == NULL)
 				return value;
-			if (cdev->config)
+
 				f = cdev->config->interface[intf];
 			break;
 
