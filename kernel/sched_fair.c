@@ -3707,18 +3707,8 @@ static void task_move_group_fair(struct task_struct *p, int on_rq)
 	if (!on_rq)
 		p->se.vruntime -= cfs_rq_of(&p->se)->min_vruntime;
 	set_task_rq(p, task_cpu(p));
- 	if (!on_rq)
-		p->se.vruntime += cfs_rq_of(&p->se)->min_vruntime;
-}
-
-static void prep_move_group_fair(struct task_struct *p, int on_rq)
-{
-	struct cfs_rq *cfs_rq = task_cfs_rq(p);
-	struct sched_entity *se = &p->se;
-
-	/* normalize the runtime of a sleeping task before moving it */
 	if (!on_rq)
-		se->vruntime -= cfs_rq->min_vruntime;
+		p->se.vruntime += cfs_rq_of(&p->se)->min_vruntime;
 }
 #endif
 
@@ -3771,7 +3761,6 @@ static const struct sched_class fair_sched_class = {
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	.task_move_group	= task_move_group_fair,
-	.prep_move_group	= prep_move_group_fair,
 #endif
 };
 
