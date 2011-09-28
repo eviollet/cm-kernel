@@ -108,9 +108,9 @@ static void ppp_async_process(unsigned long arg);
 static void async_lcp_peek(struct asyncppp *ap, unsigned char *data,
 			   int len, int inbound);
 
-static const struct ppp_channel_ops async_ops = {
-	.start_xmit = ppp_async_send,
-	.ioctl      = ppp_async_ioctl,
+static struct ppp_channel_ops async_ops = {
+	ppp_async_send,
+	ppp_async_ioctl
 };
 
 /*
@@ -184,7 +184,7 @@ ppp_asynctty_open(struct tty_struct *tty)
 	tasklet_init(&ap->tsk, ppp_async_process, (unsigned long) ap);
 
 	atomic_set(&ap->refcnt, 1);
-	sema_init(&ap->dead_sem, 0);
+	init_MUTEX_LOCKED(&ap->dead_sem);
 
 	ap->chan.private = ap;
 	ap->chan.ops = &async_ops;

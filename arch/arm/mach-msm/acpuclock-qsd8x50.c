@@ -117,8 +117,6 @@ struct clkctl_acpu_speed *acpu_stby = &acpu_freq_tbl[2];
 
 struct clkctl_acpu_speed *acpu_mpll = &acpu_freq_tbl[2];
 
-
-
 #ifdef CONFIG_CPU_FREQ_TABLE
 static struct cpufreq_frequency_table freq_table[ARRAY_SIZE(acpu_freq_tbl)];
 
@@ -559,8 +557,7 @@ int acpuclk_get_index(void)
 
 uint32_t acpuclk_get_switch_time(void)
 {
-	// switch time may include a voltage switch so add these times together
-	return drv_state.acpu_switch_time_us; //+drv_state.vdd_switch_time_us;
+	return drv_state.acpu_switch_time_us;
 }
 
 unsigned long acpuclk_power_collapse(int from_idle)

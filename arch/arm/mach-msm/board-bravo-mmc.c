@@ -26,7 +26,7 @@
 #include <asm/gpio.h>
 #include <asm/io.h>
 #include <asm/mach-types.h>
-#include <asm/mach/mmc.h>
+#include <mach/mmc.h>
 
 #include <mach/vreg.h>
 

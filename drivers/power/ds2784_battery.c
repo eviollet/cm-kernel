@@ -328,13 +328,12 @@ static int ds2784_battery_read_status(struct ds2784_device_info *di)
 
 	ds2784_parse_data(di->raw, &di->status);
 
-	pr_info("batt: %3d%%, %d mV, %d mA (%d avg), %d.%d C, %d mAh, CM=%d\n",
+	pr_info("batt: %3d%%, %d mV, %d mA (%d avg), %d.%d C, %d mAh\n",
 		di->status.percentage,
 		di->status.voltage_uV / 1000, di->status.current_uA / 1000,
 		di->status.current_avg_uA / 1000,
 		di->status.temp_C / 10, di->status.temp_C % 10,
-		di->status.charge_uAh / 1000,
-		di->status.charge_mode);
+		di->status.charge_uAh / 1000);
 
 	return 0;
 }
@@ -798,27 +797,18 @@ static int battery_adjust_charge_state(struct ds2784_device_info *di)
 
 	if(!enable_charge)
 		charge_mode = CHARGE_OFF;
+	if (di->status.percentage < 95)
+    		di->status.battery_full = 0;
 
 	/* shut off charger when full:
 	 * - CHGTF flag is set
-	 * - battery drawing less than 80mA
-	 * - battery at 100% capacity
-	 *
-	 * We don't move from full to not-full until
-	 * we drop below 95%, to avoid confusing the
-	 * user while we're maintaining a full charge
-	 * (slowly draining to 95 and charging back
-	 * to 100)
 	 */
-	if (di->status.percentage < 99)  {
-		di->status.battery_full = 0;
-	}
-	if (enable_charge && (di->status.status_reg & 0x80) &&
-	((di->status.current_avg_uA/1000) <= 40) &&
-	(di->status.percentage == 100)) {	
+	if (enable_charge && (di->status.status_reg & 0x80)) {
 		di->status.battery_full = 1;
 		charge_mode = CHARGE_BATT_DISABLE;
-	} 
+	} else
+		di->status.battery_full = 0;
+
 
 	if (temp >= TEMP_HOT) {
 		if (temp >= TEMP_CRITICAL)
@@ -842,7 +832,7 @@ static int battery_adjust_charge_state(struct ds2784_device_info *di)
 			charge_mode = CHARGE_BATT_DISABLE;
 	}
 
-	if (di->status.battery_full == 1)
+	if (di->status.current_uA > 1024)
 		di->last_charge_seen = di->last_poll;
 	else if (di->last_charge_mode != CHARGE_OFF &&
 		 check_timeout(di->last_poll, di->last_charge_seen, 60 * 60)) {

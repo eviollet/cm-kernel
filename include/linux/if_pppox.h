@@ -42,10 +42,10 @@
  * PPPoE addressing definition 
  */ 
 typedef __be16 sid_t;
-struct pppoe_addr {
-	sid_t         sid;                    /* Session identifier */
-	unsigned char remote[ETH_ALEN];       /* Remote address */
-	char          dev[IFNAMSIZ];          /* Local device to use */
+struct pppoe_addr{ 
+       sid_t           sid;                    /* Session identifier */ 
+       unsigned char   remote[ETH_ALEN];       /* Remote address */ 
+       char            dev[IFNAMSIZ];          /* Local device to use */ 
 }; 
  
 /************************************************************************ 
@@ -84,7 +84,7 @@ struct sockaddr_pppol2tp {
 	sa_family_t     sa_family;      /* address family, AF_PPPOX */
 	unsigned int    sa_protocol;    /* protocol identifier */
 	struct pppol2tp_addr pppol2tp;
-} __attribute__((packed));
+}__attribute__ ((packed));
 
 /* The L2TPv3 protocol changes tunnel and session ids from 16 to 32
  * bits. So we need a different sockaddr structure.
@@ -93,7 +93,7 @@ struct sockaddr_pppol2tpv3 {
 	sa_family_t     sa_family;      /* address family, AF_PPPOX */
 	unsigned int    sa_protocol;    /* protocol identifier */
 	struct pppol2tpv3_addr pppol2tp;
-} __attribute__((packed));
+} __attribute__ ((packed));
 
 /*********************************************************************
  *
@@ -115,7 +115,7 @@ struct pppoe_tag {
 	__be16 tag_type;
 	__be16 tag_len;
 	char tag_data[0];
-} __attribute__ ((packed));
+} __attribute ((packed));
 
 /* Tag identifiers */
 #define PTT_EOL		__cpu_to_be16(0x0000)
@@ -143,7 +143,7 @@ struct pppoe_hdr {
 	__be16 sid;
 	__be16 length;
 	struct pppoe_tag tag[0];
-} __attribute__((packed));
+} __attribute__ ((packed));
 
 /* Length of entire PPPoE + PPP header */
 #define PPPOE_SES_HLEN	8
@@ -192,8 +192,8 @@ struct pppopns_opt {
 
 struct pppox_sock {
 	/* struct sock must be the first member of pppox_sock */
-	struct sock sk;
-	struct ppp_channel chan;
+	struct sock		sk;
+	struct ppp_channel	chan;
 	struct pppox_sock	*next;	  /* for hash table */
 	union {
 		struct pppoe_opt pppoe;
@@ -227,7 +227,7 @@ struct pppox_proto {
 	struct module	*owner;
 };
 
-extern int register_pppox_proto(int proto_num, const struct pppox_proto *pp);
+extern int register_pppox_proto(int proto_num, struct pppox_proto *pp);
 extern void unregister_pppox_proto(int proto_num);
 extern void pppox_unbind_sock(struct sock *sk);/* delete ppp-channel binding */
 extern int pppox_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg);

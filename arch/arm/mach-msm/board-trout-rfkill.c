@@ -49,43 +49,21 @@ static int trout_rfkill_probe(struct platform_device *pdev)
 	int rc = 0;
 	bool default_state = true;  /* off */
 
-	rc = gpio_request(TROUT_GPIO_BT_32K_EN, "rfkill");
-	if (rc) {
-		rc = -EBUSY;
-		goto err_gpio_en;
-	}
-	rc = gpio_request(101, "rfkill");
-	if (rc) {
-		rc = -EBUSY;
-		goto err_gpio_101;
-	}
-
 	bluetooth_set_power(NULL, default_state);
 
 	bt_rfk = rfkill_alloc(bt_name, &pdev->dev, RFKILL_TYPE_BLUETOOTH,
 				&trout_rfkill_ops, NULL);
-	if (!bt_rfk) {
-		rc = -ENOMEM;
-		goto err_alloc;
-	}
+	if (!bt_rfk)
+		return -ENOMEM;
 
 	rfkill_set_states(bt_rfk, default_state, false);
 
 	/* userspace cannot take exclusive control */
 
 	rc = rfkill_register(bt_rfk);
+
 	if (rc)
-		goto err_register;
-	return rc;
-
-err_register:
-	rfkill_destroy(bt_rfk);
-err_alloc:
-	gpio_free(101);
-err_gpio_101:
-	gpio_free(TROUT_GPIO_BT_32K_EN);
-err_gpio_en:
-
+		rfkill_destroy(bt_rfk);
 	return rc;
 }
 
@@ -93,9 +71,6 @@ static int trout_rfkill_remove(struct platform_device *dev)
 {
 	rfkill_unregister(bt_rfk);
 	rfkill_destroy(bt_rfk);
-
-	gpio_free(TROUT_GPIO_BT_32K_EN);
-	gpio_free(101);
 
 	return 0;
 }

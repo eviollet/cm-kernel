@@ -34,30 +34,30 @@ static struct mutex mic_lock;
 static struct mutex bt_sco_lock;
 
 static struct q6_hw_info q6_audio_hw[Q6_HW_COUNT] = {
-  [Q6_HW_HANDSET] = {
-    .min_gain = -1500,
-    .max_gain = 1199,
-  },
-  [Q6_HW_HEADSET] = {
-    .min_gain = -2000,
-    .max_gain = 1199,
-  },
-  [Q6_HW_SPEAKER] = {
-    .min_gain = -1000,
-    .max_gain = 800,
-  },
-  [Q6_HW_TTY] = {
-    .min_gain = 0,
-    .max_gain = 0,
-  },
-  [Q6_HW_BT_SCO] = {
-    .min_gain = -1000,
-    .max_gain = 2000,
-  },
-  [Q6_HW_BT_A2DP] = {
-    .min_gain = -1100,
-    .max_gain = 2000,
-  },
+	[Q6_HW_HANDSET] = {
+		.min_gain = -3000,
+		.max_gain = 1000,
+	},
+	[Q6_HW_HEADSET] = {
+		.min_gain = -3000,
+		.max_gain = 1000,
+	},
+	[Q6_HW_SPEAKER] = {
+		.min_gain = -1100,
+		.max_gain = 900,
+	},
+	[Q6_HW_TTY] = {
+		.min_gain = -1600,
+		.max_gain = 400,
+	},
+	[Q6_HW_BT_SCO] = {
+		.min_gain = -2400,
+		.max_gain = 0,
+	},
+	[Q6_HW_BT_A2DP] = {
+		.min_gain = -2400,
+		.max_gain = 0,
+	},
 };
 
 void bravo_headset_enable(int en)
@@ -276,5 +276,5 @@ void __init bravo_audio_init(void)
 	q6audio_register_analog_ops(&ops);
 	acoustic_register_ops(&acoustic);
 	if (is_cdma_version(system_rev))
-		q6audio_set_acdb_file("default_PMIC.acdb");
+		q6audio_set_acdb_file("default_mos.acdb");
 }
