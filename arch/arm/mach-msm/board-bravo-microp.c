@@ -41,7 +41,6 @@
 #include <linux/lightsensor.h>
 #include <mach/mmc.h>
 #include <mach/htc_35mm_jack.h>
-//#include <asm/setup.h>
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 #include <linux/mutex.h>
@@ -756,9 +755,14 @@ static ssize_t microp_i2c_led_blink_store(struct device *dev,
 	case 1:
 	case 2:
 	case 3:
-		mode = val + 1;
-		break;
-
+	  mode = val + 1;
+	  break;
+	case 4:
+ 	  if (ldata->type == AMBER_LED) {
+	    mode = val + 1;
+	    break;
+	  }
+	  /* else fall through to EINVAL */
 	default:
 		mutex_unlock(&ldata->led_data_mutex);
 		return -EINVAL;
