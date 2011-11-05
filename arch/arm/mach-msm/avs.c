@@ -101,8 +101,11 @@ struct clkctl_acpu_speed {
 };
 
 #ifndef MAX
-#define MAX(A,B)	(A>B?A:B)
-#endif // !ndef MAX
+# define	MAX(A,B)	(A>B?A:B)
+#endif // !def MAX
+#ifndef MIN
+# define	MIN(A,B)	(A<B?A:B)
+#endif // !def MIN
 
 struct clkctl_acpu_speed acpu_vdd_tbl[] = {
   {  19200, VOLTAGE_MIN_START, 975, 1 },
@@ -225,7 +228,10 @@ static void avs_update_voltage_table(short *vdd_table)
 
 		if (cur_voltage >= VOLTAGE_MAX || cur_voltage >= acpu_vdd_tbl[cur_freq_idx].max_vdd)
 			printk(KERN_ERR
-				"AVS: Voltage can not get high enough!\n");
+			       "AVS: %d: Voltage (%d) can not get high enough! Max=%d\n",
+			       acpu_vdd_tbl[cur_freq_idx].acpu_khz,
+			       cur_voltage,
+			       MIN(VOLTAGE_MAX, acpu_vdd_tbl[cur_freq_idx].max_vdd));
 
 		/* Raise the voltage for all frequencies */
 		for (i = 0; i < avs_state.freq_cnt; i++) {
