@@ -41,10 +41,14 @@ CONFIG_LOCK_KERNEL=y
 CONFIG_INIT_ENV_ARG_LIMIT=32
 CONFIG_CROSS_COMPILE=""
 <<<<<<< HEAD
+<<<<<<< HEAD
 CONFIG_LOCALVERSION="-ManU-2.1.1-GB-HAVS-AXI-128-BFS"
 =======
 CONFIG_LOCALVERSION="-ManU-2.0.2-GB-HAVS-AXI-128-BFS"
 >>>>>>> 6f3a386... Fixed VPN on MIUI (and perhaps other ROMs) thanks to mondilv@xda
+=======
+CONFIG_LOCALVERSION="-ManU-2.0.3-GB-HAVS-AXI-128-BFS"
+>>>>>>> a451674... ondemand: Remove the iowait-is-busy tunable code [thalamus]
 # CONFIG_LOCALVERSION_AUTO is not set
 CONFIG_HAVE_KERNEL_GZIP=y
 CONFIG_HAVE_KERNEL_LZMA=y
@@ -1010,7 +1014,7 @@ CONFIG_DUMMY=y
 # CONFIG_BONDING is not set
 # CONFIG_MACVLAN is not set
 # CONFIG_EQUALIZER is not set
-CONFIG_TUN=y
+CONFIG_TUN=m
 # CONFIG_VETH is not set
 # CONFIG_PHYLIB is not set
 CONFIG_NET_ETHERNET=y
