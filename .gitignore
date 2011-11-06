@@ -31,6 +31,7 @@ modules.builtin
 *.lzo
 *.patch
 *.gcno
+kernel-*.zip
 
 #
 # Top-level generic files
