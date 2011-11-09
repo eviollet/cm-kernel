@@ -656,6 +656,16 @@ static ssize_t show_vdd_levels_havs(struct cpufreq_policy *policy, char *buf)
 	return acpuclk_get_vdd_levels_havs_str(buf);
 }
 
+extern ssize_t	avs_get_vdd_table_str(char *buf);
+static ssize_t	show_vdd_table_havs(struct cpufreq_policy *policy, char *buf) {
+  return avs_get_vdd_table_str(buf);
+}
+
+extern ssize_t	avs_get_vdd_tables_str(char *buf);
+static ssize_t	show_vdd_tables_havs(struct cpufreq_policy *policy, char *buf) {
+  return avs_get_vdd_tables_str(buf);
+}
+
 int	atoi(char *string) {
   int	retCode=0;
   int	sign=1;
@@ -816,6 +826,8 @@ cpufreq_freq_attr_rw(scaling_setspeed);
 #ifdef CONFIG_CPU_FREQ_VDD_LEVELS
 #ifdef CONFIG_MSM_CPU_AVS
 cpufreq_freq_attr_rw(vdd_levels_havs);
+cpufreq_freq_attr_ro(vdd_table_havs);
+cpufreq_freq_attr_ro(vdd_tables_havs);
 #else
 cpufreq_freq_attr_rw(vdd_levels);
 #endif // AVS
@@ -836,6 +848,8 @@ static struct attribute *default_attrs[] = {
 #ifdef CONFIG_CPU_FREQ_VDD_LEVELS
 #ifdef CONFIG_MSM_CPU_AVS
 	&vdd_levels_havs.attr,
+	&vdd_table_havs.attr,
+	&vdd_tables_havs.attr,
 #else
 	&vdd_levels.attr,
 #endif // AVS

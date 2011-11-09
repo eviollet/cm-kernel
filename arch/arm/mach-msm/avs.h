@@ -38,6 +38,7 @@
 //#define VOLTAGE_MIN  925 /* mV */
 #define VOLTAGE_MIN  BRAVO_TPS65023_MIN_UV_MV /* mV */
 #define VOLTAGE_MAX  BRAVO_TPS65023_MAX_UV_MV
+#define	VOLTAGE_MAX_SAFE	VOLTAGE_MAX-50	// MAX voltage for safe frequencies (1300 mV)
 #define	VOLTAGE_MIN_START	1000	// Minimum value to start off with
 #define VOLTAGE_STEP 25
 
