@@ -217,7 +217,7 @@ static void avs_update_voltage_table(short *vdd_table)
 	int cpu;
 	int vu;
 	int l2;
-	u32 cur_freq_idx;
+	u32 cur_freq_idx, f;
 	short cur_voltage;
 
 	cur_freq_idx = avs_state.freq_idx;
@@ -258,7 +258,11 @@ static void avs_update_voltage_table(short *vdd_table)
 	}
 
 		// Raise the voltage only for the current frequency
-		vdd_table[cur_freq_idx]=cur_voltage;
+		//vdd_table[cur_freq_idx]=cur_voltage;
+		// Raise the voltage for the current frequency and all frequencies that are above it
+		for (f=cur_freq_idx; acpu_vdd_tbl[f].acpu_khz; f++) {
+		  vdd_table[f]=MAX(vdd_table[f], cur_voltage);
+		}
 	} else if ((cpu == 1) && (l2 == 1) && (vu == 1)) {
   //AVSDEBUG("cur_voltage=%d, min_vdd=%d, vdd_table=%d\n", cur_voltage, acpu_vdd_tbl[cur_freq_idx].min_vdd, vdd_table[cur_freq_idx]);
 	  // Only lower vdd for the current frequency
