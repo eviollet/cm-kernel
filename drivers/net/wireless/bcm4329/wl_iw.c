@@ -58,7 +58,7 @@ typedef const struct si_pub  si_t;
 
 #include <wl_iw.h>
 
-
+extern int	wlLowPower;	// Set to 1 if low power is set when the screen is off. Defined in bcmsdh_sdmmc_linux.c
 
 #ifndef IW_ENCODE_ALG_SM4
 #define IW_ENCODE_ALG_SM4 0x20
@@ -4785,7 +4785,7 @@ wl_iw_set_power(
 
 	WL_TRACE(("%s: SIOCSIWPOWER\n", dev->name));
 
-	pm = vwrq->disabled ? PM_OFF : PM_FAST;
+	pm = vwrq->disabled ? PM_OFF : (wlLowPower==1?PM_MAX:PM_FAST);
 
 	pm = htod32(pm);
 	if ((error = dev_wlc_ioctl(dev, WLC_SET_PM, &pm, sizeof(pm))))
@@ -8318,3 +8318,4 @@ void wl_iw_detach(void)
 	}
 #endif
 }
+

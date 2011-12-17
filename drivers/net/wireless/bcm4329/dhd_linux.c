@@ -67,6 +67,8 @@
 
 struct semaphore wifi_control_sem;
 
+extern int	wlLowPower;	// Set to 1 if low power is set when the screen is off. Defined in bcmsdh_sdmmc_linux.c
+
 struct dhd_bus *g_bus;
 
 static struct wifi_platform_data *wifi_control_data = NULL;
@@ -535,7 +537,7 @@ static void dhd_set_packet_filter(int value, dhd_pub_t *dhd)
 #if defined(CONFIG_HAS_EARLYSUSPEND)
 static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 {
-	int power_mode = PM_FAST;
+	int power_mode = (wlLowPower==1?PM_MAX:PM_FAST);
 	/* wl_pkt_filter_enable_t	enable_parm; */
 	char iovbuf[32];
 	int bcn_li_dtim = 3;
