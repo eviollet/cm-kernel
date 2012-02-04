@@ -71,7 +71,7 @@ void sdio_function_cleanup(void);
 
 /* module param defaults */
 static int clockoverride = 0;
-int	wlLowPower=0;	// Set to 1 if low power is set when the screen is off. Defined in bcmsdh_sdmmc_linux.c
+int	wlLowPower=1;	// Set to 1 if low power is set when the screen is off. Defined in bcmsdh_sdmmc_linux.c
 
 module_param(clockoverride, int, 0644);
 MODULE_PARM_DESC(clockoverride, "SDIO card clock override");
